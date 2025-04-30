@@ -1,0 +1,18 @@
+# Pyrefly
+
+## Docs
+
+- [Configuration](configuration): Configure Pyrefly settings and options
+- [Error Kinds](error-kinds): Pyrefly error categories and suppression codes
+- [Error Suppressions](error-suppresions): How to suppress errors in Pyrefly
+- [Getting Started](getting-started): Quick start guide for Pyrefly
+- [IDE](IDE): Pyrefly in the IDE
+- [Import Resolution](import-resolution): How Pyrefly finds and resolves imports
+- [Introduction](index): Guides and references for all you need to know about Pyrefly
+- [Installation](installation): How to install Pyrefly
+- [Migrating from Mypy](migrating-from-mypy): How to switch from Mypy to Pyrefly
+- [Migrating from Pyright](migrating-from-pyright): How to switch from Pyright to Pyrefly
+- [Migrating to Pyrefly](migrating-to-pyrefly): How to switch from another typechecker to Pyrefly
+- [FAQ](pyrefly-faq): Frequently Asked Questions about Pyrefly, a PEP 484 compliant Type Checker for Python and IDE extension.
+- [Typing for Python Developers](python-typing-5-minutes): Get to know Python's Type System with working examples
+- [Python Typing for Beginners](python-typing-for-beginners): A gentle, example‑driven introduction to static type hints in Python.

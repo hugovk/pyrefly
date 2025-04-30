@@ -1,0 +1,1857 @@
+---
+title: IDE
+
+description: Pyrefly in the IDE
+---
+
+# Pyrefly in the IDE
+Pyrefly seamlessly integrates into IDEs with our [VSCode](https://marketplace.visualstudio.com/items?itemName=meta.pyrefly) and [OpenVSX](https://open-vsx.org/extension/meta/pyrefly) extensions. For other editors like vim/emacs, see [other editors](#other-editors).
+
+## Quick start
+1. Install the Pyrefly extension from the [VSCode marketplace](https://marketplace.visualstudio.com/items?itemName=meta.pyrefly) or [OpenVSX](https://open-vsx.org/extension/meta/pyrefly)
+2. Open a python file and the extension will activate
+
+## Features
+The Pyrefly extension provides:
+- Inline type errors matching the Pyrefly command-line
+- Types shown inline and on hover
+- Go-to definition
+- Autocomplete / intellisense
+
+## Customization
+By default, Pyrefly should work in the IDE with no configuration necessary. But to ensure your project is set up properly, see [configurations](../configuration).
+
+The following configuration options are IDE-specific:
+- `python.pyrefly.disableLanguageServices` [boolean: false]: by default, Pyrefly will provide both type errors and other language features like go-to definition, intellisense, hover, etc. Enable this option to keep type errors from Pyrefly but use VSCode's Python extension for everything else.
+
+If the project configuration does not specify the Python interpreter, Pyrefly will use the [interpreter selected in VSCode](https://code.visualstudio.com/docs/python/environments).
+
+## Issues?
+If you experience issues with the Pyrefly extension, please create an [issue](https://github.com/facebook/pyrefly/issues) on github.
+
+## Other Editors
+Support for other editors is community-driven. If you would like to set this up, please contribute.
+
+- An unofficial Jetbrains extension has been developed [here](https://plugins.jetbrains.com/plugin/26829-pyrefly)
+- For Neovim support, see the issue [here](https://github.com/facebook/pyrefly/issues/55)
+
+
+---
+
+---
+title: Configuration
+slug: /configuration
+
+description: Configure Pyrefly settings and options
+---
+
+# Pyrefly Configuration
+
+Pyrefly has a basic configuration that can (or will) allow you to customize your
+Pyrefly runs without having to specify all of your arguments on the command
+line.
+
+NOTE: this is early in its development, so the options listed here are subject
+to change in name, usage, type, quantity, and structure.
+
+Configurations can be specified in a [TOML file](https://toml.io/en/) at the root of
+your project (or elsewhere, as long as the path-based config options point to the right place) named
+`pyrefly.toml`, with all configuration options in the top-level of the document.
+You can also specify a configuration in a `pyproject.toml` under a `[tool.pyrefly]`
+section. Other config names can be used when explicitly passing in the config file
+name with the `--config`/`-c` flag, but they will not be automatically found by
+[Configuration Finding](#configuration-finding).
+
+Both absolute and config-relative paths are supported.
+
+## Precedence in Options
+
+The following is the order in which configuration options are selected:
+
+1. CLI flag
+2. Environment variable override -- This is the same as `PYREFLY_<CLI flag name>`
+3. Configuration option
+4. Hard-coded default
+
+## Type Checking Modes
+
+Pyrefly has two different modes it can run in when type checking your project, which
+correspond to different but useful ways we expect most people to interact with Pyrefly:
+
+- Project mode: attempt to load a config, falling back to Pyrefly's default config when
+  none can be found, and type check using that one config. This involves getting the
+  [`project_includes`](#project_includes) and [`project_excludes`](#project_excludes) from the file, expanding the patterns,
+  and type checking on those files.
+  - Project mode is used whenever `-c`/`--config` is passed in OR when no files are
+    provided with the CLI invocation.
+- Per-file or Single-file mode: when given [`FILES...`](#project_includes) (and optionally [`--project-excludes`](#project_excludes))
+  during a CLI invocation, expand the patterns and find the relevant config file for each
+  file listed. `project_includes` and `project_excludes` are ignored from the config file,
+  but it is used for all remaining config options.
+
+## Configuration Finding
+
+In both project checking mode and single-file checking mode (see [Type Checking Modes](#type-checking-modes)
+for more info), we may perform an upward file search to find a
+configuration file if one is not provided with `-c`/`--config`. We each directory
+from the 'start location' to the filesystem root, looking first for `pyrefly.toml` then `pyproject.toml`, in
+the same directory before looking at its parent.
+
+For project checking mode, the 'start location' is current working directory. For single-file checking mode,
+the start location is the directory containing each file to be type checked, and
+we find the config for each file matched by the pattern provided. No
+config flag can be passed into Pyrefly in single file checking mode, since the behavior
+is very ambiguous (would we apply the given config to each file? should the config
+override all settings, or just some of them?, ...).
+
+If a `pyrefly.toml` is found, it is parsed and used for type checking, and will
+return an error to the user on invalid types, syntax, values, or unknown config options.
+
+If a `pyproject.toml` is found, Pyrefly will use the `[tool.pyrefly]`
+section if it exists, otherwise it will assume a default config.
+The same errors will be returned as when loading a `pyrefly.toml` if
+the config is invalid.
+
+## Configuration Options
+
+The following section lists all recognized options that can be specified in a config
+file or `pyproject.toml` Pyrefly config section.
+
+### `project_includes`
+
+The glob patterns used to describe which files to type
+check, typically understood as user-space files.
+
+This does not specify
+[Import Resolution](./import-resolution.mdx) priority or the path an
+import should be resolved from. See [`search_path`](#search_path) instead.
+
+- Type: list of [filesystem glob patterns](#filesystem-globbing)
+- Default: `["**/*.py", "**/*.pyi"]`
+- Flag equivalent: `FILES...` argument
+- Equivalent configs: `include` in Pyright, `files`/`modules`/`packages` in
+  mypy
+- Notes:
+  - When overridden by passing in `FILES...`, we do not consult the
+    relevant config file for what to use for `project_excludes`. If
+    `project_excludes` should not use the default value, override it with the flag as
+    well.
+  - When a `project_includes` pattern does not match any files, we will return
+    an error.
+  - If you get an error about no matches for a directory when passing a glob as a CLI
+    argument, try wrapping the glob in quotes to prevent eager shell glob expansion.
+
+### `project_excludes`
+
+The glob patterns used to describe which files to avoid
+type checking as way to filter files that match `project_includes`,
+but we don't want to type check.
+
+- Type: list of [filesystem glob patterns](#filesystem-globbing)
+- Default: `["**/__pycache__/**", "**/.[!/.]*"]`
+- Flag equivalent: `--project-excludes`
+- Equivalent configs: `exclude` in Pyright and mypy
+- Notes:
+  - It is an error if no files are returned from any `project_includes` because
+    they are filtered out by `project_excludes` entries. We differentiate between
+    an error from a `project_includes` that doesn't match any files, and an error
+    from all `project_includes` getting filtered by `project_excludes`.
+  - When passing in `FILES...`, we also do not consult the config file for
+    what to use for `project_excludes`. If `project_excludes` should not use
+    the default value, override it with a flag as well. When no `FILES...` are passed,
+    `project_excludes` overrides the config's value.
+
+### `search_path`
+
+A file path describing the roots from which imports should be
+found and imported from (including modules in [`project_includes`](#project_includes)). This takes
+the [highest precedence in import order](./import-resolution.mdx#absolute-imports),
+before `typeshed` and [`site_package_path`](#site_package_path). When a `project_includes`
+type checked file is imported by another type checked file, we check all search roots to
+determine how to import it.
+
+- Type: list of directories specifying the root
+- Default: `["."]`
+- Flag equivalent: `--search-path`
+- ENV equivalent: `PYREFLY_SEARCH_PATH`
+- Equivalent configs: `extraPaths` in Pyright, `mypy_path` in mypy
+- Notes:
+  - We automatically append `"."` (the directory containing the
+    configuration file) to the `search_roots` when type checking as a sensible
+    default and last attempt at an import.
+  - Libraries should not be listed here, since they may override `typeshed`
+    values for your whole project, and have different import semantics with
+    respect to typing. See
+    [Import Resolution](./import-resolution.mdx)
+    for more information about how modules are imported.
+
+### `site_package_path`
+
+A file path describing a root from which imports should
+be found and imported from. This takes the lowest priority in import
+resolution, after [`search_path`](#search_path) and `typeshed`.
+
+`site_package_path` entries have special rules around when they can be imported,
+according to the typing specification. See
+[Site Package Path Typing Rules](./import-resolution.mdx#site-package-path-typing-rules)
+for more information, and [`use_untyped_imports`](#use_untyped_imports) and
+[`ignore_missing_source`](#ignore_missing_source) for details on how to configure
+that behavior.
+
+- Type: list of directories
+- Default: result from [Environment Autoconfiguration](#environment-autoconfiguration), or
+  `[]` if the Python interpreter cannot be queried
+- Flag equivalent: `--site-package-path`
+- ENV equivalent: `PYREFLY_SITE_PACKAGE_PATH`
+- Equivalent configs: none
+
+NOTE: Ideally, this should not be set manually, unless you're using a venv, running one-off tests,
+testing specific behavior, or having trouble with [Environment Autoconfiguration](#environment-autoconfiguration).
+Setting this explicitly, especially when not using a venv, will make it difficult for your configuration
+to be reused between different systems and platforms.
+
+### `python_platform`
+
+The value used with conditions based on type checking
+against
+[`sys.platform`](https://docs.python.org/3/library/sys.html#sys.platform)
+values.
+
+- Type: string
+- Default: result from [Environment Autoconfiguration](#environment-autoconfiguration), or
+  "linux" if the Python interpreter cannot be queried
+- Flag equivalent: `--python-platform`
+- ENV equivalent: `PYREFLY_PYTHON_PLATFORM`
+- Equivalent configs: `pythonPlatform` in Pyright, `platform` in mypy
+
+### `python_version`
+
+The value used with conditions based on type checking
+against
+[`sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
+values. The format should be `<major>[.<minor>[.<micro>]]`, where minor and
+micro can be omitted to take the default positional value.
+
+- Type: string of the format `<major>[.<minor>[.<micro>]]`
+- Default: result from [Environment Autoconfiguration](#environment-autoconfiguration), or
+  `3.13.0` if the Python interpreter cannot be queried
+- Flag equivalent: `--python-version`
+- ENV equivalent: `PYREFLY_PYTHON_VERSION`
+- Equivalent configs: `pythonVersion` in Pyright, `python_version` in mypy
+
+### `python_interpreter`
+
+The Python interpreter to query when attempting to autoconfigure
+Python environment values (`site_package_path`, `python_platform`, `python_version`).
+See the [Environment Autoconfiguration section](#environment-autoconfiguration) for more information.
+
+- Type: path to executable
+- Default: `$(which python3)`, then `$(which python)`, or none
+- Flag equivalent: `--python-interpreter`
+- ENV equivalent: `PYREFLY_PYTHON_INTERPRETER`
+- Equivalent configs: `python_executable` in mypy
+- Notes:
+  - This executes the value present in the `python_interpreter` field without any checks. It could
+    be a security risk if your `python_interpreter` is an arbitrary executable.
+
+NOTE: Ideally, this should not be set manually, unless you're using a venv, running one-off tests,
+testing specific behavior, or having trouble with [Environment Autoconfiguration](#environment-autoconfiguration).
+Setting this explicitly, especially when not using a venv, will make it difficult for your configuration
+to be reused between different systems and platforms.
+
+### `errors`
+
+Configure (enable and disable) the errors Pyrefly emits. `true` (default) tells Pyrefly to
+emit the error, while `false` tells Pyrefly to hide it.
+
+- Type: Table of [error code](./error-kinds.mdx) to boolean representing enabled status
+- Default: `errors = {}`/`[errors]`
+- Flag equivalent: none
+- ENV equivalent: none
+- Equivalent configs:
+  [type check rule overrides](https://microsoft.github.io/pyright/#/configuration?id=type-check-rule-overrides)
+  and [type evaluation settings](https://microsoft.github.io/pyright/#/configuration?id=type-evaluation-settings)
+  in Pyright,
+  [`enable_error_code`](https://mypy.readthedocs.io/en/stable/config_file.html#confval-enable_error_code) and
+  [`disable_error_code`](https://mypy.readthedocs.io/en/stable/config_file.html#confval-disable_error_code)
+  in mypy
+- Notes: setting `<error-code> = true` is the same as having no error code configuration present, which means
+  the error will be shown. Setting `<error-code> = false` will disable the error for type checking.
+
+### `replace_imports_with_any`
+
+[`ModuleGlob`](#module-globbing)s of modules from which import errors should be
+ignored, and the module should be replaced with `typing.Any`. For example, with
+`from x.y import z` in a file, adding `x.*`, `*.y`, or `x.y` to this config will
+silence those import errors and replace the module with `typing.Any`. If the module can be found, its type
+information will still be replaced with `typing.Any`.
+
+- Type: list of regex
+- Default: `[]`
+- Flag equivalent: none
+- ENV equivalent: none
+- Equivalent configs: `ignore_missing_imports` or `follow_imports = skip` in mypy
+- Notes:
+  - `errors = {import-error = false}` (TOML inline table for `errors`) has similar behavior in Pyrefly, but ignores
+    *all* import errors instead of import errors from specific modules, and won't replace findable modules with `typing.Any`.
+
+### `ignore_errors_in_generated_code`
+
+Whether to ignore type errors in generated code. If enabled, generated files
+will be treated as if they are included in `project_excludes`.
+The generated code status is determined by checking if the file contents contain
+the substring '<span>&#64;</span>generated'.
+
+- Type: bool
+- Default: false
+- Flag equivalent: `--ignore-errors-in-generated-code`
+- ENV equivalent: `IGNORE_ERRORS_IN_GENERATED_CODE`
+- Equivalent configs: none
+
+### `use_untyped_imports`
+
+Whether to search imports in [`site_package_path`](#site_package_path) that do not have a
+`py.typed` file unconditionally. When this is true, we skip any checks for `py.typed` files,
+and return the first valid import we can find. See
+[Site Package Path Typing Rules](./import-resolution.mdx#site-package-path-typing-rules) for
+more information on when a `site_package_path` cannot be used for typing information.
+
+- Type: bool
+- Default: true
+- Flag equivalent: none
+- ENV equivalent: none
+- Equivalent configs: `useLibraryCodeForTypes` in Pyright, `follow_untyped_imports` in mypy
+
+### `ignore_missing_source`
+
+Whether to skip the check for a non-stubs package when a `-stubs` package is found in
+[`site_package_path`](#site_package_path). When this is true, we immediately return
+a `-stubs` package when found.
+
+The check for a non-stubs package exists to ensure you have an importable package to use
+in your project. When this check returns an import error, it means we couldn't find a package,
+and that at runtime you may not actually be able to import the given package, even if its
+type stubs could be found. See
+[Stub Files vs Source Files](./import-resolution.mdx#stub-files-vs-source-files) for more information.
+
+## Configuration Details
+
+This section describes some of the configuration options, behaviors, or types in more depth, when
+there are details shared between multiple config options or the information is more than what
+can fit under a single config option description.
+
+### Environment Autoconfiguration
+
+If any of [`python_platform`](#python_platform), [`python_version`](#python_version), or
+[`site_package_path`](#site_package_path) are empty, we attempt to query an interpreter
+for the missing values. By default we query `$(which python3)` or `$(which python)` if they're available on the path,
+but the interpreter can be overridden with the [`python_interpreter`](#python_interpreter) config option and flag.
+If the interpreter does not exist, we fall back to Pyrefly's defaults for all unspecified values.
+
+The values queried from the interpreter are:
+* `python_platform`: `sys.platform`
+* `python_version`: `sys.version_info[:3]`
+* `site_package_path`: `site.getsitepackages() + [site.getusersitepackages()]`
+
+### Filesystem Globbing
+
+We use a standard Unix-style glob, which allows for wildcard matching when specifying a fileset. It is similar
+to regex, but more restricted given the subset of allowed syntax for paths on a filesystem. We currently only
+allow matching files with a `.py` or `.pyi` suffix.
+
+The globs provided are relative to the config, if one is found, or the current working directory otherwise.
+Absolute path globs can also be provided, though this is generally not recommended, since it may not
+be compatible with other systems type checking your project.
+
+- We recognize the following wildcards:
+  - `*`, which matches zero or more characters in a single directory component
+  - `**`, which matches the current and any sub directories/files in those sub directories
+  - `?`, which matches any one character
+  - `[<pattern>]`, which matches any character or character range between the brackets (character range separated by `-`)
+  - `[!<pattern>]`, which excludes any character or character range between the brackets and after the `!`
+  - `[]` can be used to match `?`, `*`, `[`, `]` literally (e.g. `[?]`), although these are invalid as part of a Python path.
+
+We also support non-wildcard paths, so a relative (or absolute) path like `src/` will match all Python files under `src/`
+or `src/my_file.py` will match `src/my_file.py` exactly.
+
+Any directories matched will also have their `.py` and `.pyi` files recursively matched. `src/*` will match all files and
+directories under `src/`, so therefore, we will recursively match everything under `src/`.
+
+Examples:
+- `src/**/*.py`: only match `.py` files under `src/`
+- `src`, `src/`, `src/*`, `src/**`, and `src/**/*`: match all `.py` and `.pyi` files under `src/
+- `?.py` and `[A-z].py`: match any file that looks like `<letter>.py`
+- `src/path/to/my/file.py`: only match `src/path/to/my/file.py`
+- `src/**/tests`, `src/**/tests/`, `src/**/tests/**`, and `src/**/tests/**/*`: match all `.py` and `.pyi` files in `src/`
+  under a directory named `tests`
+
+### Module Globbing
+
+In some config options, we've added globbing for module paths. This is different from both path globs and regex,
+in the sense that we're performing a match on a Python dotted import, such as `this.is.any.module`.
+The only wildcard we recognize is `*`, which represents zero or more segments of a module path, unless it starts a glob,
+in which case it must match one or more segments. The wildcard must be surrounded
+by `.`, unless it is at the start or end of a module glob.
+
+Examples:
+- `this.is.a.module` would be equivalent to a regex like `^this\.is\.a\.module`. It will only match imports that look like
+`this.is.a.module`.
+- `this.is.*.module` would become `^this\.is(\..+)*\.module$`. It would match:
+  - `this.is.module`
+  - `this.is.a.module`
+  - `this.is.a.really.long.path.to.a.module`
+- `*.my.module` would be equivalent to a regex like `^.+\.my\.module$`.
+  - It would match:
+    - `this.is.my.module`
+    - `heres.my.module`
+  - It will not match:
+    - `my.module`
+- `this.is.*` would be equivalent to a regex like `^this\.is(\..+)*`. It would match:
+  - `this.is.my.module`
+  - `this.is`
+
+## Example Configuration
+
+This section displays an example config showing the usage of all config options listed above to make creating
+your own easier, and to give you an easy place to start.
+
+### Default `pyrefly.toml`
+
+This is a configuration with the Pyrefly defaults. If you have an
+interpreter installed, some of these values may be overridden.
+
+```toml
+#### configuring what to type check and where to import from
+project_includes = ["."]
+project_excludes = ["**/__pycache__/**", "**/.[!/.]*"]
+search_path = ["."]
+site_package_path = []
+
+#### configuring your python environment
+python_platform = "linux"
+python_version = "3.13"
+# default is null/none
+# python_interpreter = null
+
+#### configuring your type check settings
+
+replace_imports_with_any = []
+ignore_errors_in_generated_code = false
+use_untyped_imports = false
+ignore_missing_source = false
+
+[errors]
+```
+
+### Example `pyrefly.toml`
+
+```toml
+#### configuring what to type check and where to import from
+project_includes = ["src"]
+project_excludes = ["**/__pycache__/**", "**/.[!/.]*", "**/tests"]
+search_path = ["src"]
+site_package_path = ["venv/lib/python3.12/site-packages"]
+
+#### configuring your python environment
+python_platform = "linux"
+python_version = "3.12"
+python_interpreter = "venv/bin/python3"
+
+#### configuring your type check settings
+replace_imports_with_any = [
+  "sympy.*",
+  "*.series",
+]
+
+ignore_errors_in_generated_code = true
+use_untyped_imports = true
+ignore_missing_source = true
+
+[errors]
+bad-assignment = false
+invalid-argument = false
+```
+
+### Example `pyproject.toml`
+
+```toml
+...
+
+# Pyrefly header
+[pyrefly]
+
+#### configuring what to type check and where to import from
+project_includes = ["src"]
+project_excludes = ["**/__pycache__/**", "**/.[!/.]*", "**/tests"]
+search_path = ["src"]
+site_package_path = ["venv/lib/python3.12/site-packages"]
+
+#### configuring your python environment
+python_platform = "linux"
+python_version = "3.12"
+python_interpreter = "venv/bin/python3"
+
+#### configuring your type check settings
+replace_imports_with_any = [
+  "sympy.*",
+  "*.series",
+]
+
+ignore_errors_in_generated_code = true
+use_untyped_imports = true
+ignore_missing_source = true
+
+[pyrefly.errors]
+bad-assignment = false
+invalid-argument = false
+
+# other non-Pyrefly configs
+...
+```
+
+
+---
+
+---
+title: Error Kinds
+
+description: Pyrefly error categories and suppression codes
+---
+
+# Error Kinds
+
+An _error kind_ categorizes an error by the part of the typing specification
+that an error is related to. Every error has exactly one kind.
+
+The main use of error kinds is as short names ("slugs") that can be used in
+error suppression comments.
+
+## annotation-mismatch
+
+This error indicates a mismatch between multiple annotations for a single
+variable. This is relatively uncommon, but it can happen in if-statements:
+
+```python
+if some_cond:
+    x: int = 1
+else:
+    x: str = "two" # Inconsistent type annotations for x: str, int [annotation-mismatch]
+```
+
+It can be helpful to annotate the variable before branch, especially if there is
+a useful default value for it. For example:
+
+```python
+x: str = "default"
+if some_cond:
+  x = "actual value"
+```
+
+## assert-type
+
+An `assert-type` error is raised when a `typing.assert_type()` call fails.
+
+This error kind should never be suppressed, since that rather defeats the point
+of of `typing.assert_type()`.
+
+## async-error
+
+`async-error` is reported when attempting to `await` on something that is not
+awaitable. This may indicate that a function should have been marked `async` but
+wasn't.
+
+```python
+def some_func() -> None:
+  ...
+
+await some_func() # Expression is not awaitable [async-error]
+```
+
+This will also arise if the context manager used in an `async with` statement
+has `__aenter__` and `__aexit__` methods that are not marked `async`.
+
+The fix is to use an `async` function in the `await`. This may mean making the
+function `async` or finding an existing `async` function to use instead.
+
+## bad-argument-count
+
+This error arises when a function is called with the wrong number of arguments.
+
+```python
+def takes_three(one: int, two: int, three: int) -> complex:
+  ...
+
+take_three(3, 2)  # Expected 1 more positional argument [bad-argument-count]
+```
+
+Note that `missing-argument` will be raised if pyrefly can identify that
+specific arguments are missing. As such, this error is more likely to appear
+when too many args are supplied, rather than too few.
+
+This example shows both kinds of errors:
+
+```python
+from typing import Callable
+def apply(f: Callable[[int, int], int]) -> int:
+    return f(1)  # Expected 1 more positional argument [bad-argument-count]
+apply() # Missing argument `f` in function `apply` [missing-argument]
+```
+
+## bad-argument-type
+
+This error indicates that the function was called with an argument of the wrong
+type.
+
+```python
+def example(x: int) -> None:
+  ...
+example("one")  # Argument `Literal['two']` is not assignable to parameter `x` with type `int` in function `example` [bad-argument-type]
+```
+
+This can also happen with `*args` and `**kwargs`:
+
+```python
+def bad_args(*args: int) -> None:
+  ...
+
+bad_args(1, "two")  # Argument `Literal['two']` is not assignable to parameter with type `int` in function `bad_args` [bad-argument-type]
+```
+
+```python
+def bad_kwargs(**kwargs: int) -> None:
+  ...
+
+bad_args(x=1, y="two")  # Keyword argument `y` with type `Literal['two']` is not assignable to kwargs type `int` in function `bad_kwargs` [bad-argument-type]
+```
+
+## bad-assignment
+
+The most common cause of this error is attempting to assign a value that conflicts with the variable's type annotation.
+
+```python
+x: str = 1 # `Literal[1]` is not assignable to `str` [bad-assignment]
+```
+
+However, it can occur in several other situations.
+
+Here, `x` is marked as `Final`, so assigning a new value to it is an error.
+
+```python
+from typing import Final
+x: Final = 1
+x = 2 # `x` is marked final [bad-assignment]
+```
+
+In another case, attempting to annotate an assignment to an instance attribute raises this error.
+
+```python
+class A:
+    x: int
+a = A()
+a.x: int = 2  # Type cannot be declared in assignment to non-self attribute `a.x` [bad-assignment]
+```
+
+## bad-class-definition
+
+This error indicates that there is something wrong with the class definition.
+It tends to be a bit rarer, since most issues would be tagged with other error kinds, such as
+`annotation-mismatch` or one of the function errors.
+inheritance has its own complexities, so it has its own error kind called `invalid-inheritance`.
+
+One place you may see it is dynamic class generation:
+
+```python
+from enum import Enum
+Ex = Enum("Ex", [("Red", 1), ("Blue", 2), ("Red", 3)])  # Duplicate field `Red` [bad-class-definition]
+```
+
+However, it is best practice to use the class syntax if possible, which doesn't treat duplicate names as an error.
+
+## bad-function-definition
+
+Like `bad-class-definition`, this error kind is uncommon because other error kinds are used for more specific issues.
+For example, argument order is enforced by the parser, so `def f(x: int = 1, y: str)` is a `parse-error`.
+
+## bad-keyword-argument
+
+Attempting to call a function with an incorrect keyword argument. e.g. f(x=1,
+x=2), or perhaps f(y=1) (where `f` has no parameter `y`).
+
+## bad-override
+
+A subclass field or method incorrectly overrides a field/method of a parent
+class.
+
+## bad-return
+
+Attempting to return a value that does not match the function's return type. Can
+also arise when returning values from generators.
+
+## bad-specialization
+
+Attempting to specialize a generic class with incorrect type arguments. e.g.
+`type[int, str]` is an error because `type` accepts only 1 type arg.
+
+## bad-unpacking
+
+An error caused by unpacking. e.g. attempting to unpack an iterable into the
+wrong number of variables.
+
+## delete-error
+
+Attempting to `del` something that cannot be deleted.
+
+## import-error
+
+An error related to the import machinery. e.g. failed to import a module.
+
+## index-error
+
+Attempting to access a container with an incorrect index. This only occurs when
+pyre can statically verify that the index is incorrect.
+
+## internal-error
+
+Internal Pyre error.
+
+## invalid-annotation
+
+Attempting to write an annotation that is invalid for some reason.
+
+## invalid-argument
+
+Passing an argument that is invalid for reasons besides type.
+
+## invalid-inheritance
+
+An error caused by incorrect inheritance in a class or type definition. e.g. a
+metaclass that is not a subclass of `type`.
+
+## invalid-literal
+
+Attempting to use a value that is not a valid kind of Literal.
+
+## invalid-overload
+
+An error caused by incorrect usage of the @overload decorator. e.g. not defining
+multiple variants for an overloaded function.
+
+## invalid-param-spec
+
+An error related to ParamSpec definition or usage.
+
+## invalid-super-call
+
+Attempting to call `super()` in a way that is not allowed. e.g. calling
+`super(Y, x)` on an object `x` that does not match the class `Y`.
+
+## invalid-syntax
+
+Incorrect Python syntax, construct is not allowed in this position.
+
+## invalid-type-var
+
+An error caused by incorrect usage or definition of a TypeVar.
+
+## invalid-type-var-tuple
+
+An error caused by incorrect usage or definition of a TypeVarTuple.
+
+## invalid-yield
+
+Attempting to use `yield` in a way that is not allowed. e.g. `yield from` with
+something that's not an iterable.
+
+## match-error
+
+An error caused by a bad match statement. e.g. Writing a Foo(x, y, z) pattern
+when Foo only matches on (x, y).
+
+## missing-argument
+
+An error caused by calling a function without all the required arguments. Should
+be used when we can name the specific arguments that are missing.
+
+## missing-attribute
+
+Attempting to access an attribute that does not exist.
+
+## missing-module-attribute
+
+Accessing an attribute that does not exist on a module.
+
+## no-access
+
+The attribute exists but does not support this access pattern.
+
+## no-matching-overload
+
+Attempting to call an overloaded function, but none of the signatures match.
+
+## not-a-type
+
+Attempting to use something that isn't a type where a type is expected. This is
+a very general error and should be used sparingly.
+
+## not-callable
+
+Attempting to call a value that is not a callable.
+
+## not-iterable
+
+Attempting to use a non-iterable value as an iterable.
+
+## parse-error
+
+An error related to parsing or syntax.
+
+## read-only
+
+The attribute exists but cannot be modified.
+
+## reveal-type
+
+Raised by a call to `reveal_type()`.
+
+## type-alias-error
+
+An error related to type alias usage or definition.
+
+## typed-dict-key-error
+
+An error related to TypedDict keys. e.g. attempting to access a TypedDict with a
+key that does not exist.
+
+## unbound-name
+
+Attempting to use a name that may be unbound or uninitialized.
+
+## unexpected-keyword
+
+An error caused by a keyword argument used in the wrong place.
+
+## unknown-name
+
+Attempting to use a name that is not defined.
+
+## unsupported-operand
+
+Attempting to apply an operator to arguments that do not support it.
+
+## unsupported
+
+Attempting to use a feature that is not yet supported.
+
+
+---
+
+---
+title: Error Suppressions
+
+description: How to suppress errors in Pyrefly
+---
+
+INFO TO BE ADDED
+
+
+---
+
+---
+title: Getting Started
+
+description: Quick start guide for Pyrefly
+---
+
+Pyrefly isn't ready just yet,  but you can see our roadmap [here](https://github.com/facebook/pyrefly/milestone/1). We will be populating this section soon!
+
+
+---
+
+---
+title: Import Resolution
+slug: /import-resolution
+
+description: How Pyrefly finds and resolves imports
+---
+
+# Import Resolution
+
+This doc describes how imports in a given file are found and their bindings are
+resolved, including files that are being type checked.
+
+NOTE: see the [Configuration documentation](./configuration.mdx) for more info on
+the config items referenced below.
+
+## Relative Imports
+
+If the import is relative (starting with one or more dots), the import is
+resolved relative to the path of the file importing it. A single dot at the
+beginning of the import (e.g. `.file.to.import`) represents the current
+directory, and more dots (e.g. `..other.file`) will continue to walk upward.
+
+## Absolute Imports
+
+For absolute imports, Pyrefly uses the following import strategy:
+
+1. Try to import from each entry in [`search_path`](./configuration.mdx#search_path) in the order they appear
+   using the module finding strategy. a. NOTE: we append the config file's
+   directory to `search_path` automatically when using a config file as a
+   sensible last-resort for attempting an import.
+2. Try to import from `typeshed`.
+3. Try to find a stub package corresponding to the import we're trying to resolve in
+   [`site_package_path`](./configuration.mdx#site_package_path).
+   Entries earlier in the `site_package_path` list will be selected before those appearing later in the list.
+   See [the typing spec](https://typing.python.org/en/latest/spec/distributing.html#stub-only-packages) for
+   more info on stub packages.
+    1. If we find a `-stubs` package, but there's no non-stubs package, return an import error.
+4. Try to find a non-stub package corresponding to the import we're trying to resolve in `site_package_path`.
+   Entries earlier in the `site_package_path` list will be selected before those appearing later in the list.
+5. Return an import error.
+
+See [Site Package Path Typing Rules](#site-package-path-typing-rules) for more information about which
+modules are valid imports from [`site_package_path`](./configuration.mdx#site_package_path), and
+how to override that behavior.
+
+### Site Package Path Typing Rules
+
+We respect typing rules as defined by the typing spec for
+[stubs packages](https://typing.python.org/en/latest/spec/distributing.html#stub-only-packages),
+[partial stubs packages](https://typing.python.org/en/latest/spec/distributing.html#partial-stub-packages),
+and [py.typed](https://typing.python.org/en/latest/spec/distributing.html#packaging-type-information) files.
+That means:
+- if we can find any `-stubs` package, we do not fall back to non-stubs packages unless any of them contain a
+  `py.typed` file in their top-level containing the content `partial\n`.
+- if we can't find any `-stubs` packages, only accept a package's types if it contains a `py.typed` file. Here,
+  we only check for the existence of the file, not for any contents.
+
+You can control the above behavior with the following two configs:
+- [`use_untyped_imports`](./configuration.mdx#use_untyped_imports): don't worry about looking for any `py.typed`
+  file. Check for `-stubs` first and fall back to non-stubs, regardless of the presence of a `py.typed` with
+  `partial\n` or if the non-stubs packages contain a `py.typed`.
+- [`ignore_missing_source`](./configuration.mdx#ignore_missing_source): don't try to check for a backing non-stubs
+  package when we find a `-stubs` package. Immediately return the `-stubs` package when found.
+
+## Stub Files vs Source Files
+
+A
+[stub file](https://typing.python.org/en/latest/spec/distributing.html#stub-files)
+is any file that ends with a `.pyi` file suffix. They have many uses, including
+adding typing to non-Python extension code, distributing typing information
+separate from implementation, or overriding an implementation with more accurate
+typing information.
+
+A stub package is a second package corresponding to a regular package, with `-stubs`
+appended to its name. A `-stubs` package should only include stub files (`.pyi`),
+which override any `.py` or `.pyi` files in the non-stubs package. These are preferred
+when available, since they contain the interfaces a library exposes to developers. An
+example of this includes the popular library [`pandas`](https://github.com/pandas-dev/pandas),
+and its stub package, [`pandas-stubs`](https://github.com/pandas-dev/pandas-stubs).
+
+When importing from a non-stubs package, Pyrefly loads typing information from
+imports by first searching for a relevant `-stubs` package, then by looking at
+the non-stubs package's `.pyi` files, then falls back to a `.py` file. See
+[Absolute Imports](#absolute-imports) for details on when non-stubs packages
+are allowed to be used for types, and how you can override that behavior.
+
+
+---
+
+---
+title: Introduction
+description: Guides and references for all you need to know about Pyrefly
+---
+
+import SandboxBrowserOnly from '@site/src/sandbox/SandboxBrowserOnly'
+
+Pyrefly is a static typechecker for Python that helps you catch type-related errors before your code runs. It analyzes your Python code to ensure type consistency throughout your codebase, making your applications more reliable and easier to maintain. Pyrefly supports both IDE integration and CLI usage, giving you flexibility in how you incorporate type checking into your workflow.
+
+## Benefits of Type Checking
+
+Adding type annotations to your Python code and using a typechecker like Pyrefly provides several important benefits:
+
+- **Catch bugs early** - Identify type-related errors during development rather than at runtime
+- **Improve code quality** - Type annotations serve as living documentation, making your code more readable and self-documenting
+- **Enhance developer experience** - Get better IDE support with accurate autocomplete, refactoring tools, and inline documentation
+- **Safer refactoring** - Make large-scale changes with confidence, knowing the typechecker will catch incompatible type usage
+- **Better collaboration** - Types create clear contracts between different parts of your codebase, making it easier for teams to work together
+
+## Try Pyrefly
+
+Here's a simple example showing how Pyrefly can catch type errors:
+
+<pre>
+  <SandboxBrowserOnly
+    sampleFilename="getting_started.py"
+    isCodeSnippet={true}
+    codeSample={`# Example: Basic Type Checking
+
+def greet(name: str) -> str:
+    return "Hello, " + name
+
+# This works fine since both "World" is a string and greet expects a string
+message = greet("World")
+
+# Pyrefly catches this error before runtime due to a type misatch between 42 and "str"
+# Error: Argument of type 'int' is not assignable to parameter of type 'str'
+error_message = greet(42)
+`}
+  />
+</pre>
+
+In this example, Pyrefly flags the second call to `greet()` because we're passing an integer (`42`) where a string is expected, helping you catch this issue before your code runs. To learn more about Python typing and how to use it effectively, check out our [Python Typing for Beginners](python-typing-for-beginners) page.
+
+## Next Steps
+
+Ready to get started with Pyrefly? Check out these resources:
+
+- [Installation Guide](./installation) - Install and set up Pyrefly for your project
+- [IDE Integration](./IDE) - Use Pyrefly in your favorite editor
+- [Python Typing for Beginners](./python-typing-for-beginners) - Master the basics of Python's type system
+- [Frequently Asked Questions](./pyrefly-faq) - Common questions about Pyrefly
+
+## Configuration
+
+Once you've installed Pyrefly, you can customize its behavior:
+
+- [Configuration Guide](./configuration) - Configure Pyrefly for your project's specific needs
+
+## Migrating from Other Typecheckers
+
+If you're currently using a different Python typechecker, we have guides to help you migrate to Pyrefly:
+
+- [Migrating to Pyrefly](./migrating-to-pyrefly) - Transition from other typecheckers like Mypy or Pyright to Pyrefly
+
+## Error Kinds
+
+Pyrefly provides detailed explanations for all the errors it can detect:
+
+- [Error Kinds](./error-kinds) - A comprehensive list of all Pyrefly errors with their explanations
+
+## Advanced Topics
+
+As you become more familiar with Pyrefly, explore these advanced topics:
+
+- [Error Suppressions](./error-suppresions) - Learn how to suppress specific errors that show up in Pyrefly
+- [Import Resolution](./import-resolution) - Learn how Pyrefly resolves imports in your code
+
+
+---
+
+---
+title: Installation
+
+description: How to install Pyrefly
+---
+
+
+Pyrefly isn't ready just yet,  but you can see our roadmap [here](https://github.com/facebook/pyrefly/milestone/1). We will be populating this section soon!
+
+----
+
+If you want to experiment with our tool, the easiest way to install Pyrefly is via `pip`.
+
+```
+pip install pyrefly
+```
+
+Then, `cd` into the directory or project you would like to type check and run
+
+```
+pyrefly check
+```
+
+You'll want to set up a basic configuration file to type check your project. You can add configuration options to a `pyproject.toml` file, or create a `pyrefly.toml` file in your project directory.
+
+```
+[tool.pyrefly]
+search_path = [
+    "example_directory/..."
+]
+```
+
+Then, simply run `pyrefly check`, this time the tool will use your configuration options.
+
+It's likely the tool will return a list of type errors, this is perfectly normal. At this point you have a few options:
+
+1. Silence the errors using `# pyrefly: ignore` comments. This will get your project to a clean type checking state and you can drive down the number of errors as you go. We've included a script that can do this for you:
+
+```
+pyrefly check --suppress-errors
+```
+2. Use extra configuration options to silence specific categories of errors, or exclude files with more errors than average.
+
+----
+## Upgrading Pyrefly
+
+Upgrading the version of Pyrefly you're using, or a third party library you depend on can surface new type errors in your code. Fixing them all at once is often not realistic. We've written scripts to help you temporarily silence them.
+
+```
+# step 1
+pyrefly check --suppress-errors
+```
+
+```
+# step 2
+<run your formatter of choice>
+```
+
+```
+# step 3
+pyrefly check --remove-unused-ignores
+```
+Repeat the steps above until you get a clean formatting run and a clean type check.
+
+This will add ` # pyrefly: ignore` comments to your code that will enable you to silence errors, and come back and fix them at a later date. This can make the process of upgrading a large codebase much more manageable.
+
+
+---
+
+---
+title: Migrating from Mypy
+
+description: How to switch from Mypy to Pyrefly
+---
+
+## Running Pyrefly
+
+Like mypy, pyrefly can be given a list of files to check:
+
+```sh
+$ pyrefly check file1.py file2.py
+```
+
+The easiest way to run pyrefly on all files in a project is to run it from the project root:
+
+```sh
+$ cd your/project
+$ pyrefly check
+```
+
+Pyrefly is designed to have sensible defaults, and you may not need to configure it at all.
+However, projects with existing mypy configs may want to configure pyrefly to suit their own needs.
+
+## Mypy Config Migration
+
+To make it as easy as possible to get started with pyrefly, we've provided a script for automatically migrating a mypy config to pyrefly.
+
+```sh
+$ pyrefly config-migration path/to/your/mypy.ini
+```
+
+This will load your existing `mypy.ini` and transform it into a `pyrefly.toml` while preserving as many options as possible. See `config-migration --help` for more options.
+
+We do recommend checking the resulting config for errors. While there is some overlap between mypy's config options and pyrefly's config options, it's not always possible to cleanly translate one config option to another.
+
+If you'd rather start fresh with a hand-written config, please see the [pyrefly configuration docs](../configuration). If you run into any issues with config migration, please [let us know](https://github.com/facebook/pyrefly/issues)!
+
+### Config Migration Details
+
+`files`, `modules`, and `packages` are combined into `project_includes`. This should work exactly the same for `files` and `packages`. Mypy doesn't recurse into `modules`, but pyrefly will.
+
+Pyrefly makes an effort to transform the `exclude` regex into a list of filepath globs for `project_excludes`. This should excel on simple regexes, such as `some/file.py|exclude_dir/`, which becomes `["**/some/file.py", "**/exclude_dir/"]`.
+
+The `ignore_missing_imports` per-module config option is turned into a list of modules. For example:
+
+```ini
+[mypy-some.*.module]
+ignore_missing_imports = True
+```
+
+Becomes:
+
+```toml
+replace_imports_with_any = ["some.*.module"]
+```
+
+Pyrefly does support mypy's [module name pattern syntax](https://mypy.readthedocs.io/en/stable/config_file.html#config-file-format).
+
+Mypy's `follow_untyped_imports` option is allowed to be global or per-module. The pyrefly equivalent, `use_untyped_imports`, is only global. If any per-module section in the mypy config has `follow_untyped_imports = True`, then `use_untyped_imports` will be `true` in the pyrefly config.
+
+## Silencing Errors
+
+Like mypy, pyrefly has ways to silence specific error codes. Full details can be found in the [Error Suppression docs](../error-suppresions)
+
+To silence an error on a specific line, add a disable comment above that line:
+
+```
+# pyrefly: ignore
+x: str = 1
+```
+
+To suppress all instances of an error, disable that error in the config:
+
+```
+[errors]
+import-error = false
+```
+
+This is equivalent to mypy's `disable_error_code`, though of course the [error codes](../error-kinds) are different!
+
+
+---
+
+---
+title: Migrating from Pyright
+
+description: How to switch from Pyright to Pyrefly
+---
+
+## Running Pyrefly
+
+Like pyright, pyrefly can be given a list of files to check:
+
+```sh
+$ pyrefly check file1.py file2.py
+```
+
+The easiest way to run pyrefly on all files in a project is to run it from the project root:
+
+```sh
+$ cd your/project
+$ pyrefly check
+```
+
+Pyrefly doesn't need a config file to start checking your code. Its sensible defaults are designed to work well for most projects.
+However, projects with existing pyright configs may want to configure pyrefly to suit their own needs.
+
+## Pyright Config Migration
+
+To make it as easy as possible to get started with pyrefly, we've provided a script for automatically migrating a pyright config to pyrefly.
+
+```sh
+$ pyrefly config-migration path/to/your/pyrightconfig.json
+```
+
+This will load your existing `pyrightconfig.json` and transform it into a `pyrefly.toml` while preserving as many options as possible. See `config-migration --help` for more options.
+
+There is a significant overlap between pyright's and pyrefly's configuration options, so migration is pretty straightforward. However, it may be worth checking the generated config for errors, just in case.
+
+If you'd rather start fresh with a hand-written config, please see the [pyrefly configuration docs](../configuration). If you run into any issues with config migration, please [let us know](https://github.com/facebook/pyrefly/issues)!
+
+## Config Migration Details
+
+When it comes to listing files, pyright uses just paths, while pyrefly supports glob patterns. Thankfully, paths are a subset of glob patterns, so pyrefly can just use the paths as-is. You could consider manually simplifying the paths into glob patterns, but it's not necessary.
+
+Pyright supports four platforms: Windows, Linux, Darwin (macOS), and All. Since pyrefly only supports Python's [supported platforms](https://docs.python.org/3/library/sys.html#sys.platform), we choose to treat "All" as "linux".
+
+## Silencing Errors
+
+Like pyright, pyrefly has ways to silence specific error codes. Full details can be found in the [Error Suppression docs](../error-suppresions).
+
+To silence an error on a specific line, add a disable comment above that line:
+
+```
+# pyrefly: ignore
+x: str = 1
+```
+
+To suppress all instances of an error, disable that error in the config:
+
+```
+[errors]
+import-error = false
+```
+
+This is similar to pyright's [type check rule overrides](https://microsoft.github.io/pyright/#/configuration?id=type-check-rule-overrides), though of course the [error codes](../error-kinds) are different!
+
+
+---
+
+---
+title: Migrating to Pyrefly
+description: How to switch from another typechecker to Pyrefly
+---
+
+# Migrating to Pyrefly
+
+Welcome to the Pyrefly migration guide. This section provides resources to help you transition from other type checkers to Pyrefly.
+
+## Migration Guides
+
+- [Migrating from Mypy](migrating-from-mypy.mdx) - Guide for transitioning from Mypy to Pyrefly
+- [Migrating from Pyright](migrating-from-pyright.mdx) - Guide for transitioning from Pyright to Pyrefly
+
+Choose the appropriate guide based on your current type checker to get started with your migration to Pyrefly.
+
+
+---
+
+---
+id: pyrefly-faq
+
+title: FAQ
+
+slug: /pyrefly-faq
+
+description:
+    Frequently Asked Questions about Pyrefly, a PEP 484 compliant Type Checker for
+    Python and IDE extension.
+---
+
+# Pyrefly Frequently Asked Questions
+
+### What is Pyrefly?
+
+Pyrefly is a type checker for Python powering a fast and flexible IDE
+experience. It's a work in progress, but showing promising results for checking
+large code bases, better type inference and giving instant responses in IDE.
+
+### How do I pronounce Pyrefly?
+
+It's pronounced PIE-ur-fly, rhyming with "firefly."
+
+### What is the relationship to Pyre?
+
+Pyrefly is a ground-up rebuild that doesn’t share any core type checking code with Pyre. Not only is Pyrefly written in a new language (Rust instead of OCaml), but our design deviates in a major way from [Pyre](https://pyre-check.org/). Rust enables us to deliver substantial performance improvements and support multiple operating systems (including Windows). Beyond the core type checker itself, there are helper tooling and many lessons learned that we will take from Pyre and the community of Python type checking maintainers who have done tremendous work to get the state of type checking to where it is today.
+
+### Yet another Type Checker! Why not improve the ones adopted by the community already?
+
+We are standing on the shoulders of giants. The contributions to Python typing by Mypy, Pyright, Pytype, Pyre and others have been invaluable. We borrowed concepts and learned from them as we rolled our own. Open source conformance matters to us a lot. While we might make some opinionated decisions, we will adhere to the PEP process. Pyre was the only type checker that could scale for Meta’s needs and was starting to show its age, so we started with a ground-up rewrite aimed at usability and performance.
+
+We built our own engine for incremental computation and designed our type checking algorithm based on years of experience in gradual type theory and Rust expertise. By open-sourcing this technology we hope it can serve projects of any size well.
+
+### Why Rust?
+
+We would have preferred to write Pyrefly in Python, but didn't think we could hit our ambitious performance goals using Python today (hopefully future work around free-threaded Python and JIT changes that). After ruling out Python, we wanted something that was safe, cross-platform, compiled to WASM (for a Playground experience). Rust and Go are probably the best choices for those goals, and our team at Meta had more experience with Rust.
+
+### Do you plan to build an LSP?
+
+Yes. See our [roadmap](https://github.com/facebook/pyrefly/milestone/1) for details.
+
+### Where do I report bugs?
+
+Please open an [issue on our GitHub](https://github.com/facebook/pyrefly/issues) page. You can leave feature requests there as well :) Our current goal is to get through our first major milestone, and after that we can look at bugs and features beyond the current roadmap.
+
+### Can I contribute to Pyrefly?
+
+Please see the: [contributing guidelines](https://github.com/facebook/pyrefly/blob/main/CONTRIBUTING.md).
+
+### How do I know this project won't go unmaintained after a year?
+
+Great question. We have made a substantial investment in Pyrefly, use it internally and aligned open source maintainability as a key principle for starting this project in the first place. We’re in it for the long haul. Using it is the best way to see increased investment from our leadership.
+
+### This is cool, I want to learn more about the technical details.
+
+See our [README.md](https://github.com/facebook/pyrefly/blob/main/README.md) for the high level design. We plan to add more detailed documentation along with announcements on [https://engineering.fb.com](https://engineering.fb.com/)
+
+### I don't like Python's Type System. Stop wasting your time.
+
+Tell us more - seriously we want to hear your objections to typing! We hope that better tooling, improvements to the type system and well typed libraries will help provide make development easier. If all else fails our fast code navigation and inference algorithm might spark joy in your IDE, so give us a chance.
+
+_Curious about something else or just want to chat about bolting types onto Python, join us on [Discord](https://discord.gg/Cf7mFQtW7W)._
+
+
+---
+
+---
+title: Typing for Python Developers
+slug: /python-typing-5-minutes
+
+description: Get to know Python's Type System with working examples
+---
+
+import SandboxBrowserOnly from '@site/src/sandbox/SandboxBrowserOnly'
+
+# Type Hints for Python Developers
+
+*5‑Minute Tour with Pyrefly*
+
+**Goal:** In five minutes you’ll know how Python’s static type system _infers_, _defines_, and _composes_ types—and you’ll have copy‑paste snippets to start using right away.
+
+If you are new to Python, check out our [Python Types for Newcomers guide](../python-typing-for-beginners/).
+
+Python's type system allow you to annotate variables so you, your teammates and your type checker can find bugs before you run your code. Think of it as documentation that's automatically validated and will help your IDE help you.
+
+_TL;DR_
+* Catch bugs **before** running the code.
+* Improve editor autocomplete & refactors.
+* Turn your code into living documentation.
+
+### Types with Inference
+
+Static analyzers can often _infer_ types from your code—no annotations required. Pyrefly takes this a step further.
+
+<pre>
+  <SandboxBrowserOnly
+  sampleFilename="basic_inference.py"
+  isCodeSnippet={true}
+  codeSample={`# Basic Inference
+answer = 42
+reveal_type(answer) # hover to reveal type
+
+fruits = ["apple", "banana", "cherry"]
+scores = {"math": 95, "science": 90}
+
+def greet(name):
+    return f"Hello, {name}!"
+
+message = greet("World")
+`}
+  />
+</pre>
+
+### Where Inference Shines ✨
+- Constant assignments (`answer = 42 -> int`)
+- List/tuple/dict literals with uniform elements (`names = ["A", "B"] -> list[str]`)
+- Return types if parameter types are annotated:
+
+<pre>
+  <SandboxBrowserOnly
+  sampleFilename="return_inference.py"
+  isCodeSnippet={true}
+  codeSample={`def add(a: int, b: int):   # ✅ param annotations
+    return a + b    # 🔍 return inferred -> int
+`}
+  />
+</pre>
+
+### When to Add Hints
+- Public APIs (library or service boundaries)
+- Mixed collections (`list[int | str]`)
+- Callable signatures (decorators, callbacks)
+
+## Define Types Inline
+
+### The Basics
+
+Python's built-in types can be used to write many simple type hints.
+<pre>
+  <SandboxBrowserOnly
+  sampleFilename="built_in_types.py"
+  isCodeSnippet={true}
+  codeSample={`# Example: Basic Types
+
+from typing import reveal_type
+
+age: int = 5
+reveal_type(age) # revealed type: Literal[5]
+
+age = "oops"
+
+name: str = "John"
+reveal_type(name) # revealed type: Literal['John']
+
+numbers: list[int] = [1, 2, 3]
+reveal_type(numbers) # revealed type: list[int]
+
+names: list[str] = ["John", "Jane"]
+reveal_type(names) # revealed type: list[str]
+
+person: dict[str, str] = {"name": "John", "age": "30"}
+reveal_type(person) # revealed type: dict[str, str]
+
+is_admin: bool = True
+reveal_type(is_admin) # revealed type: Literal[True]
+`}
+  />
+</pre>
+
+### Functions
+Defining the parameter and return types for a function doesn't just help prevent bugs, but it makes it easier to navigate in other files. You don't always need to define a return type - we'll do our best to infer it for you! We can't always get it right and an explicit return type will help your IDE navigate faster and more accurately.
+<pre>
+  <SandboxBrowserOnly
+  sampleFilename="functions_types.py"
+  isCodeSnippet={true}
+  codeSample={`# Example: Functions
+
+from typing import reveal_type
+
+def greet(name: str) -> str:
+    return f"Hello , {name}!"
+
+greet("Pyrefly")
+
+def whatDoesThisFunctionReturnAgain(a: int, b: int):
+    return a + b
+
+reveal_type(whatDoesThisFunctionReturnAgain(2, 3)) # revealed type: int
+`}
+  />
+</pre>
+
+## Advanced Types
+
+### Composing Types
+The real power comes from composing smaller pieces into richer shapes.
+
+### Unions & Optional
+<pre>
+  <SandboxBrowserOnly
+  sampleFilename="unions_types.py"
+  isCodeSnippet={true}
+  codeSample={`# Union and Optional Types
+
+from typing import Optional
+
+def to_int(data: str | bytes | None) -> Optional[int]:
+    if data is None:
+        return None
+    if isinstance(data, bytes):
+        data = data.decode()
+    return int(data)
+`}
+  />
+</pre>
+
+### Generics
+
+Generics allow you to define reusable functions and classes that work with multiple types. This feature enables you to write more flexible and adaptable code.
+
+<pre>
+  <SandboxBrowserOnly
+    sampleFilename="generics.py"
+    isCodeSnippet={true}
+    codeSample={`# Example: Generic Classes
+
+from typing import reveal_type
+
+class C[T]:
+    def __init__(self, x: T):
+        self.x = x
+    def box(self) -> list[T]:
+        return [self.x]
+
+c = C(0)
+reveal_type(c.box())  # revealed type: list[int]
+`}
+  />
+</pre>
+
+### Protocols
+
+Protocols enable structural typing, which allows you to define interfaces without explicit inheritance. This feature helps you write more modular and composable code.
+
+<pre>
+  <SandboxBrowserOnly
+    sampleFilename="protocols.py"
+    isCodeSnippet={true}
+    codeSample={`# Example: Structural Typing with Protocols
+
+from typing import Iterable, Protocol
+
+class Writer(Protocol):
+    def write(self) -> None: ...
+
+class GoodWorld:
+    def write(self) -> None:
+        print("Hello world!")
+
+class BadWorld:
+    pass
+
+def f(writer: Writer):
+    pass
+
+f(GoodWorld()) # OK
+f(BadWorld())  # ERROR!
+`}
+  />
+</pre>
+
+## Structural Types
+Python also employs a structural type system, often referred to as "duck typing." This concept is based on the idea that if two objects have the same shape or attributes, they can be treated as being of the same type.
+
+### Dataclasses
+
+Dataclasses allow you to create type-safe data structures while minimizing boilerplate.
+
+<pre>
+  <SandboxBrowserOnly
+    sampleFilename="data_classes.py"
+    isCodeSnippet={true}
+    codeSample={`# Example: Dataclasses
+
+from dataclasses import dataclass
+
+@dataclass
+class Point:
+    x: float
+    y: float
+
+Point(x=0.0, y=0.0)    # OK
+Point(x=0.0, y="oops") # ERROR!
+`}
+  />
+</pre>
+
+
+### TypedDict
+
+Typed dictionaries enable you to define dictionaries with specific key-value types. This feature lets you bring type safety to ad-hoc dictionary structures without major refactoring.
+
+<pre>
+  <SandboxBrowserOnly
+    sampleFilename="typed_dict.py"
+    isCodeSnippet={true}
+    codeSample={`# Example: TypedDict
+
+from typing import TypedDict
+
+class Movie(TypedDict):
+    name: str
+    year: int
+
+good_movie: Movie = {"name": "Toy Story", "year": 1995} # OK
+bad_movie: Movie = {"name": "The Room", "year": "2003"}  # ERROR!
+`}
+  />
+</pre>
+
+### Overloads
+
+Overloads allow you to define multiple function signatures for a single function. Like generics, this feature helps you write more flexible and adaptable code.
+
+<pre>
+  <SandboxBrowserOnly
+    sampleFilename="overloads.py"
+    isCodeSnippet={true}
+    codeSample={`# Example: Overloads
+
+from typing import overload, reveal_type
+
+@overload
+def f(x: int) -> int: ...
+
+@overload
+def f(x: str) -> str: ...
+
+def f(x: int | str) -> int | str:
+    return x
+
+reveal_type(f(0))  # revealed type: int
+reveal_type(f("")) # revealed type: str
+`}
+  />
+</pre>
+
+## Typing Features, PEPS available in each Python Version
+
+| Feature (click PEP for details) | What it adds / looks like | Introduced in |
+| --- | --- | --- |
+| [PEP 484](https://peps.python.org/pep-0484/) -- Core **type hints** & `typing` module | `def add(a: int, b: int) -> int:` | **3.5** |
+| [PEP 526](https://peps.python.org/pep-0526/) -- **Variable annotations** | `count: int = 0` | **3.6** |
+| [PEP 563](https://peps.python.org/pep-0563/) -- `from __future__ import annotations` (lazy eval) | Annotations stored as **strings** | **3.7** (future‑flag) |
+| [PEP 544](https://peps.python.org/pep-0544/) -- **Protocols** (structural typing) | `class Jsonable(Protocol): ...` | **3.8** |
+| [PEP 589](https://peps.python.org/pep-0589/) -- **TypedDict** | `class User(TypedDict): ...` | **3.8** |
+| [PEP 586](https://peps.python.org/pep-0586/) -- **Literal** types | `def log(level: Literal["info","warn"]): ...` | **3.8** |
+| [PEP 591](https://peps.python.org/pep-0591/) -- **Final** qualifier | `TOKEN: Final[str] = "..."` | **3.8** |
+| [PEP 585](https://peps.python.org/pep-0585/) -- **Built‑in generics** | `list[int]`, `dict[str, Any]` | **3.9** |
+| [PEP 593](https://peps.python.org/pep-0593/) -- **Annotated** | `x: Annotated[int, "units=px"]` | **3.9** |
+| [PEP 604](https://peps.python.org/pep-0604/) -- **Union** syntax | `int \| None` | **3.10** |
+| [PEP 612](https://peps.python.org/pep-0612/) -- **ParamSpec / Concatenate** | decorator‑safe generics | **3.10** |
+| [PEP 613](https://peps.python.org/pep-0613/) -- `TypeAlias` qualifier | `Vector: TypeAlias = list[float]` | **3.10** |
+| [PEP 647](https://peps.python.org/pep-0647/) -- **TypeGuard** for narrowing | `def is_str(x) -> TypeGuard[str]: ...` | **3.10** |
+| [PEP 655](https://peps.python.org/pep-0655/) -- `Required` / `NotRequired` for **TypedDict** | optional vs. mandatory keys | **3.11** |
+| [PEP 646](https://peps.python.org/pep-0646/) -- **Variadic generics** (`TypeVarTuple`, `Unpack`) | tensor shapes, 2‑D arrays, ... | **3.11** |
+| [PEP 673](https://peps.python.org/pep-0673/) -- **Self** type | fluent APIs: `def set(...) -> Self:` | **3.11** |
+| [PEP 681](https://peps.python.org/pep-0681/) -- **dataclass_transform** helper | libraries like Pydantic, attrs | **3.11** |
+| [PEP 695](https://peps.python.org/pep-0695/) -- **Class‑level generics syntax** | `class Box[T]: ...` | **3.12** |
+| [PEP 649](https://peps.python.org/pep-0649/) -- *New* deferred‑eval algorithm (replaces PEP 563) | becomes the default | **3.13** |
+| [PEP 698](https://peps.python.org/pep-0698/) -- `@override` decorator | flag intentional overrides | **3.13** (planned) |
+
+### Key Highlights Summary:
+- **Inference:** Python's static analyzers can infer types from your code, reducing the need for explicit annotations. This feature enhances code readability and helps catch bugs early.
+- **Defining Types:** You can define types inline using Python's built-in types, which aids in documentation and improves IDE support.
+- **Advanced Types:** The guide covers advanced concepts like composing types, using unions and optionals, generics, protocols, and structural types like dataclasses and TypedDict.
+- **Practical Examples:** The guide includes examples of functions, generic classes, structural typing with protocols, and more, demonstrating how to apply these concepts in real-world scenarios.
+
+
+---
+
+---
+id: python-typing-for-beginners
+title: Python Typing for Beginners
+description: A gentle, example‑driven introduction to static type hints in Python.
+---
+
+import SandboxBrowserOnly from '@site/src/sandbox/SandboxBrowserOnly'
+
+# Python Types for Python Beginners
+
+*A beginner‑friendly guide to adding type hints in Python.*
+
+**Note:** This tutorial assumes you understand some basic Python syntax, but are new to type hints. To learn more about Python, see the [Python Tutorial](https://docs.python.org/3/tutorial/) and [Getting Started Guide](https://www.python.org/about/gettingstarted/)
+
+## 1. What is a Type Hint in Python?
+
+A type hint in Python is a way to indicate the expected data type of a variable, function parameter, or return value. It's a hint to other developers (and to tools like type checkers and IDEs) about what type of data should be used with a particular piece of code.
+
+Type hints are **not enforced at runtime by Python itself,** but they can be used by third-party tools (like Pyrefly) to catch type-related errors before your code runs. They also serve as documentation, making it easier for others to understand how to use your code.
+Here's an example of a simple function with type hints:
+
+```
+def greet(name: str) -> None:
+    print(f"Hello, {name}!")
+```
+
+## 2. Why Bother with Type Hints?
+
+Python is a dynamically typed language, which means you can write code without declaring types. However, this can lead to bugs or ambiguity in your code.
+
+_TL;DR_
+* Catch bugs **before** running the code.
+* Improve editor autocomplete & refactors.
+* Turn your code into living documentation.
+
+
+<pre>
+  <SandboxBrowserOnly
+  sampleFilename="why_hints.py"
+  isCodeSnippet={true}
+  codeSample={`# Without hints – is "times" a str, int, or list?
+def repeat(text, times):
+    return text * times
+
+# With hints – intent is crystal clear.
+def repeat(text: str, times: int) -> str:
+    return text * times
+`}
+  />
+</pre>
+
+
+### Can you spot the bug?
+
+```
+class Rectangle:
+    width: int
+    height: int
+
+    def __init__(self, width: int, height: int) -> None:
+        self.width = width
+        self.height = height
+
+rect = Rectangle(width=100, height=50)
+
+area = rect.width * rect.hieght
+
+print(area)
+```
+
+
+**Spelling is hard!** Let's add the `dataclass` decorator to our class definition. This will generate a constructor for us, and also add a few other useful methods.
+
+<pre>
+  <SandboxBrowserOnly
+  sampleFilename="misspelled.py"
+  isCodeSnippet={true}
+  codeSample={`#Pyrefly will catch this spelling error before you run the code
+from dataclasses import dataclass
+
+@dataclass
+class Rectangle:
+    width: int
+    height: int
+
+rect = Rectangle(width=100, height=50)
+
+area = rect.width * rect.hieght
+`}
+  />
+</pre>
+
+
+## 3. Primitive Types
+
+Since Python 3.9 you can use all the [primitive types](https://docs.python.org/3/library/stdtypes.html) directly as annotations.
+
+<pre>
+  <SandboxBrowserOnly
+  sampleFilename="primitives_types.py"
+  isCodeSnippet={true}
+  codeSample={`age: int = 30
+height: float = 1.85
+name: str = "Tyler Typer"
+is_admin: bool = False
+`}
+/>
+</pre>
+
+You can also specify a parameter as optional by using `Optional` type, or now with the `| None` syntax.
+
+<pre>
+  <SandboxBrowserOnly
+  sampleFilename="primitive2_types.py"
+  isCodeSnippet={true}
+  codeSample={`# Optional typing example
+
+from typing import Optional
+
+middle_name: Optional[str] = None        # classic
+nickname: str | None = None              # 3.10+ shorthand
+`}
+/>
+</pre>
+
+## 4. Collections
+
+### Syntax	Examples
+- List of numbers	`list[int]	scores: list[int] = [98, 87, 91]`
+- Tuple of two floats	`tuple[float, float]	point: tuple[float, float] = (3.0, 4.0)`
+- Dict of str -> int	`dict[str, int]	inventory: dict[str, int] = {"apples": 5}`
+- Set of strings	`set[str]	authors: set[str] = {"Bob", "Eve"}`
+
+Since Python 3.9 you can subscript built‑ins directly—no need for `from typing import List`.
+
+## 5. Functions
+<pre>
+  <SandboxBrowserOnly
+  sampleFilename="basic_function_types.py"
+  isCodeSnippet={true}
+  codeSample={`# Simple function
+def add(a: int, b: int) -> int:
+    return a + b
+  `}
+  />
+</pre>
+Default values keep their annotation:
+
+<pre>
+  <SandboxBrowserOnly
+  sampleFilename="defaul_value_types.py"
+  isCodeSnippet={true}
+  codeSample={`# Function with default value
+
+
+def greet(name: str, polite: bool = True) -> str:
+    return "Hello!" if polite else f"Yo {name}"
+    `}
+  />
+</pre>
+Variable‑length arguments:
+
+<pre>
+  <SandboxBrowserOnly
+  sampleFilename="variable_length_types.py"
+  isCodeSnippet={true}
+  codeSample={`# Variable length functions
+from collections.abc import Callable
+
+Logger = Callable[[str], None]
+
+def debug(*msgs: str, log: Logger | None = print) -> None:
+  for m in msgs:
+    if log is not None:
+      log(m)
+    else:
+      print(m)
+    `}
+  />
+</pre>
+
+## 5. Get Type Hint Signals Directly in Your Editor
+
+You can download the [Pyrefly extension for VSCode](https://marketplace.visualstudio.com/items?itemName=meta.pyrefly) to get type hint signals directly in your IDE.
+
+Next, install [Pyrefly](../installation/) and check some code:
+```
+# Fast, zero‑config
+pip install pyrefly
+
+pyrefly check ./my_sample.py
+
+# Check whole directories
+pyrefly check app/ tests/
+```
+
+Create a `pyrefly.toml` file to configure your project. Instructions [here](../configuration).

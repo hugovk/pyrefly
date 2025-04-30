@@ -1,12 +1,12 @@
 ---
 id: python-typing-for-beginners
-title: Python Typing for Beginners
+title: Python Typing for Beginners
 description: A gentle, example‑driven introduction to static type hints in Python.
 ---
 
-import TryPyreflyBrowserOnly from '@site/src/try-pyrefly/TryPyreflyBrowserOnly'
+import SandboxBrowserOnly from '@site/src/sandbox/SandboxBrowserOnly'
 
-# Python Types for Python Beginners
+# Python Types for Python Beginners
 
 *A beginner‑friendly guide to adding type hints in Python.*
 
@@ -24,7 +24,7 @@ def greet(name: str) -> None:
     print(f"Hello, {name}!")
 ```
 
-## 2. Why Bother with Type Hints?
+## 2. Why Bother with Type Hints?
 
 Python is a dynamically typed language, which means you can write code without declaring types. However, this can lead to bugs or ambiguity in your code.
 
@@ -35,7 +35,7 @@ _TL;DR_
 
 
 <pre>
-  <TryPyreflyBrowserOnly
+  <SandboxBrowserOnly
   sampleFilename="why_hints.py"
   isCodeSnippet={true}
   codeSample={`# Without hints – is "times" a str, int, or list?
@@ -50,13 +50,53 @@ def repeat(text: str, times: int) -> str:
 </pre>
 
 
+### Can you spot the bug?
+
+```
+class Rectangle:
+    width: int
+    height: int
+
+    def __init__(self, width: int, height: int) -> None:
+        self.width = width
+        self.height = height
+
+rect = Rectangle(width=100, height=50)
+
+area = rect.width * rect.hieght
+
+print(area)
+```
+
+
+**Spelling is hard!** Let's add the `dataclass` decorator to our class definition. This will generate a constructor for us, and also add a few other useful methods.
+
+<pre>
+  <SandboxBrowserOnly
+  sampleFilename="misspelled.py"
+  isCodeSnippet={true}
+  codeSample={`#Pyrefly will catch this spelling error before you run the code
+from dataclasses import dataclass
+
+@dataclass
+class Rectangle:
+    width: int
+    height: int
+
+rect = Rectangle(width=100, height=50)
+
+area = rect.width * rect.hieght
+`}
+  />
+</pre>
+
 
 ## 3. Primitive Types
 
 Since Python 3.9 you can use all the [primitive types](https://docs.python.org/3/library/stdtypes.html) directly as annotations.
 
 <pre>
-  <TryPyreflyBrowserOnly
+  <SandboxBrowserOnly
   sampleFilename="primitives_types.py"
   isCodeSnippet={true}
   codeSample={`age: int = 30
@@ -70,10 +110,12 @@ is_admin: bool = False
 You can also specify a parameter as optional by using `Optional` type, or now with the `| None` syntax.
 
 <pre>
-  <TryPyreflyBrowserOnly
+  <SandboxBrowserOnly
   sampleFilename="primitive2_types.py"
   isCodeSnippet={true}
-  codeSample={`from typing import Optional
+  codeSample={`# Optional typing example
+
+from typing import Optional
 
 middle_name: Optional[str] = None        # classic
 nickname: str | None = None              # 3.10+ shorthand
@@ -86,14 +128,14 @@ nickname: str | None = None              # 3.10+ shorthand
 ### Syntax	Examples
 - List of numbers	`list[int]	scores: list[int] = [98, 87, 91]`
 - Tuple of two floats	`tuple[float, float]	point: tuple[float, float] = (3.0, 4.0)`
-- Dict of str -> int	`dict[str, int]	inventory: dict[str, int] = {"apples": 5}`
+- Dict of str -> int	`dict[str, int]	inventory: dict[str, int] = {"apples": 5}`
 - Set of strings	`set[str]	authors: set[str] = {"Bob", "Eve"}`
 
-Since Python 3.9 you can subscript built‑ins directly—no need for `from typing import List`.
+Since Python 3.9 you can subscript built‑ins directly—no need for `from typing import List`.
 
 ## 5. Functions
 <pre>
-  <TryPyreflyBrowserOnly
+  <SandboxBrowserOnly
   sampleFilename="basic_function_types.py"
   isCodeSnippet={true}
   codeSample={`# Simple function
@@ -105,10 +147,12 @@ def add(a: int, b: int) -> int:
 Default values keep their annotation:
 
 <pre>
-  <TryPyreflyBrowserOnly
+  <SandboxBrowserOnly
   sampleFilename="defaul_value_types.py"
   isCodeSnippet={true}
   codeSample={`# Function with default value
+
+
 def greet(name: str, polite: bool = True) -> str:
     return "Hello!" if polite else f"Yo {name}"
     `}
@@ -117,7 +161,7 @@ def greet(name: str, polite: bool = True) -> str:
 Variable‑length arguments:
 
 <pre>
-  <TryPyreflyBrowserOnly
+  <SandboxBrowserOnly
   sampleFilename="variable_length_types.py"
   isCodeSnippet={true}
   codeSample={`# Variable length functions
@@ -126,8 +170,11 @@ from collections.abc import Callable
 Logger = Callable[[str], None]
 
 def debug(*msgs: str, log: Logger | None = print) -> None:
-    for m in msgs:
-        log(m)
+  for m in msgs:
+    if log is not None:
+      log(m)
+    else:
+      print(m)
     `}
   />
 </pre>
@@ -136,26 +183,15 @@ def debug(*msgs: str, log: Logger | None = print) -> None:
 
 You can download the [Pyrefly extension for VSCode](https://marketplace.visualstudio.com/items?itemName=meta.pyrefly) to get type hint signals directly in your IDE.
 
-Next, install [Pyrefly](https://pypi.org/project/pyrefly/) and check some code:
+Next, install [Pyrefly](../installation/) and check some code:
 ```
 # Fast, zero‑config
 pip install pyrefly
 
 pyrefly check ./my_sample.py
 
-# Check you whole project
-pyrefly check my_project/
+# Check whole directories
+pyrefly check app/ tests/
 ```
 
-Create a pyrefly.toml to configure your project for Pyrefly. Instructions [here](../configuration).
-
-## 6. Next Steps
-<ol>
-  <li>Install the [Pyrefly extension](https://marketplace.visualstudio.com/items?itemName=meta.pyrefly) and require it in your project.</li>
-  <li>Annotate one small file in your project.</li>
-  <li>Fix the first few warnings—don’t chase perfection yet.</li>
-  <li>Increase coverage gradually; enjoy calmer coding.</li>
-</ol>
-Happy hacking 🐍✨
-
-### Next: [Learn Advanced Typing Features](../python-typing-5-minutes#advanced-types)
+Create a `pyrefly.toml` file to configure your project. Instructions [here](../configuration).
