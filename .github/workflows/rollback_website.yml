@@ -21,10 +21,13 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
-        # IMPORTANT: Customize the following to the date of the website build that you want to rollback to
+        # IMPORTANT: Customize the following to the date and workflow id of the website build that you want to rollback to
         # The format used for the date is YYYY-MM-DD
-          name: website-build-2025-05-01
+        # The current values are set to match the following workflow run: https://github.com/facebook/pyrefly/actions/runs/14781446659
+          name: website-build-2025-05-01 # Update the date to the date of the build that you want to rollback to
           path: website/build
+          run-id: 14781446659 # Update the workflow run ID to the one that you want to rollback to
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Deploy to github pages
