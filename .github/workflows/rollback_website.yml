@@ -11,7 +11,7 @@ on:
         required: true
         type: string
       run_id:
-        description: 'Workflow run ID containing the artifact (Fetched by going to a "Deploy Website" workflow and fetch from the url)'
+        description: 'Workflow run ID containing the artifact (Fetched by going to a "Deploy Website" workflow and looking at the url)'
         required: true
         type: string
 
