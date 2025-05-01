@@ -7,11 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       artifact_date:
-        description: 'Date of the artifact to rollback to (YYYY-MM-DD)'
+        description: 'Date to rollback to (YYYY-MM-DD)'
         required: true
         type: string
       run_id:
-        description: 'Workflow run ID containing the artifact (Fetched by going to a "Deploy Website" workflow and looking at the url)'
+        description: 'Workflow run ID to rollback to (fetched by going to the "Deploy Website" workflow and looking at the url)'
         required: true
         type: string
 
