@@ -16,7 +16,7 @@ use crate::util::args::clap_env;
 use crate::util::thread_pool::ThreadCount;
 use crate::util::thread_pool::init_thread_pool;
 use crate::util::trace::init_tracing;
-
+pub use crate::commands::init::Args as InitArgs;
 #[derive(Debug, Parser, Clone)]
 pub struct CommonGlobalArgs {
     /// Number of threads to use for parallelization.
