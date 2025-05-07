@@ -19,13 +19,6 @@ use crate::config::util::PyProject;
 use crate::util::fs_anyhow;
 use parse_display::Display;
 
-// MM: Notes:
-// pyrefly init
-// should automatically detect if you have either a mypy.ini a pyright config or a either in a pyproject.toml file
-// it should then prompt the user to migrate automatically to pyright
-// after configuration - it should run pyrefly check and give users some feedback / or suggestions.
-
-
 // This should likely be moved into config.rs
 #[derive(Clone, Debug, Parser, Copy, Display)]
 pub enum ConfigFileKind {
@@ -46,10 +39,10 @@ impl ConfigFileKind {
         }
     }
 
-    fn toml_identifier(&self) -> String {
+    fn toml_identifier(self) -> String {
         match self {
             // This makes me question if pyproject should be a part of the enum at all
-            Self::Pyproject => "".to_string(),
+            Self::Pyproject => "".to_owned(),
             _ => format!("[tool.{}]", self),
         }
 
