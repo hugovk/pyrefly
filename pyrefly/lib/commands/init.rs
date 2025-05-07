@@ -12,12 +12,50 @@ use anyhow::Context as _;
 use clap::Parser;
 use path_absolutize::Absolutize;
 use tracing::error;
-
 use crate::commands::config_migration;
 use crate::commands::run::CommandExitStatus;
 use crate::config::config::ConfigFile;
 use crate::config::util::PyProject;
 use crate::util::fs_anyhow;
+use parse_display::Display;
+
+// MM: Notes:
+// pyrefly init
+// should automatically detect if you have either a mypy.ini a pyright config or a either in a pyproject.toml file
+// it should then prompt the user to migrate automatically to pyright
+// after configuration - it should run pyrefly check and give users some feedback / or suggestions.
+
+
+// This should likely be moved into config.rs
+#[derive(Clone, Debug, Parser, Copy, Display)]
+pub enum ConfigFileKind {
+    MyPy,
+    Pyright,
+    Pyrefly,
+    Pyproject
+}
+
+
+impl ConfigFileKind {
+    fn file_name(&self) -> &str {
+        match self {
+            Self::MyPy => "mypy.ini",
+            Self::Pyright => "pyrightconfig.json",
+            Self::Pyrefly => "pyrefly.toml",
+            Self::Pyproject => "pyproject.toml"
+        }
+    }
+
+    fn toml_identifier(&self) -> String {
+        match self {
+            // This makes me question if pyproject should be a part of the enum at all
+            Self::Pyproject => "".to_string(),
+            _ => format!("[tool.{}]", self),
+        }
+
+    }
+}
+
 
 /// Initialize a new pyrefly config in the given directory. Can also be used to run pyrefly config-migration on a given project.
 #[derive(Clone, Debug, Parser)]
@@ -62,24 +100,26 @@ impl Args {
         }
     }
 
-    fn check_for_existing_config(path: &Path) -> anyhow::Result<bool> {
-        if path.ends_with(ConfigFile::PYREFLY_FILE_NAME) && path.exists() {
+    fn check_for_existing_config(path: &Path, kind: ConfigFileKind) -> anyhow::Result<bool> {
+        let file_name = kind.file_name();
+        if path.ends_with(file_name) && path.exists() {
             return Ok(true);
         }
         if path.ends_with(ConfigFile::PYPROJECT_FILE_NAME) && path.exists() {
             let raw_pyproject = fs_anyhow::read_to_string(path).with_context(|| {
                 format!(
-                    "While trying to check for an existing pyrefly config in {}",
+                    "While trying to check for an existing {} config in {}",
+                    kind,
                     path.display()
                 )
             })?;
-            return Ok(raw_pyproject.contains("[tool.pyrefly]"));
+            return Ok(raw_pyproject.contains(&kind.toml_identifier()));
         }
         if path.is_dir() {
             let pyrefly =
-                Args::check_for_existing_config(&path.join(ConfigFile::PYREFLY_FILE_NAME));
+                Args::check_for_existing_config(&path.join(file_name), kind);
             let pyproject =
-                Args::check_for_existing_config(&path.join(ConfigFile::PYPROJECT_FILE_NAME));
+                Args::check_for_existing_config(&path.join(ConfigFile::PYPROJECT_FILE_NAME), kind);
             return Ok(pyrefly? || pyproject?);
         }
         Ok(false)
@@ -88,9 +128,9 @@ impl Args {
     pub fn run(&self) -> anyhow::Result<CommandExitStatus> {
         let path = self.path.absolutize()?.to_path_buf();
 
-        if Args::check_for_existing_config(&path)? {
+        if Args::check_for_existing_config(&path, ConfigFileKind::Pyrefly)? {
             error!(
-                "The project at {} has already been initialized for pyrefly",
+                "The project at {} has already been initialized for pyrefly. Run `pyrefly check` to see type errors.",
                 path.display()
             );
             return Ok(CommandExitStatus::UserError);

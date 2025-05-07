@@ -247,6 +247,7 @@ impl ConfigFile {
     }
 }
 
+
 impl ConfigFile {
     pub const PYREFLY_FILE_NAME: &str = "pyrefly.toml";
     pub const PYPROJECT_FILE_NAME: &str = "pyproject.toml";
@@ -661,7 +662,7 @@ mod tests {
 
             [[sub_config]]
             matches = "abcd"
-            
+
             atliens = 1
         "#;
         let config = ConfigFile::parse_config(config_str).unwrap();
