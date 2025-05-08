@@ -14,5 +14,5 @@
 - [Migrating from Pyright](migrating-from-pyright): How to switch from Pyright to Pyrefly
 - [Migrating to Pyrefly](migrating-to-pyrefly): How to switch from another typechecker to Pyrefly
 - [FAQ](pyrefly-faq): Frequently Asked Questions about Pyrefly, a PEP 484 compliant Type Checker for Python and IDE extension.
+- [Typing for Python Developers](python-typing-5-minutes): Get to know Python's Type System with working examples
 - [Python Typing for Beginners](python-typing-for-beginners): A gentle, example‑driven introduction to static type hints in Python.
-- [Typing for Python Developers](typing-for-python-developers): Get to know Python's Type System with working examples
