@@ -82,8 +82,7 @@ correspond to different but useful ways we expect most people to interact with P
   none can be found, and type check using that one config. This involves getting the
   [`project_includes`](#project_includes) and [`project_excludes`](#project_excludes) from the file, expanding the patterns,
   and type checking on those files.
-  - Project mode is used whenever `-c`/`--config` is passed in OR when no files are
-    provided with the CLI invocation.
+  - Project mode is used whenever no files are provided with the CLI invocation.
 - Per-file or Single-file mode: when given [`FILES...`](#project_includes) (and optionally [`--project-excludes`](#project_excludes))
   during a CLI invocation, expand the patterns and find the relevant config file for each
   file listed. `project_includes` and `project_excludes` are ignored from the config file,
@@ -92,17 +91,21 @@ correspond to different but useful ways we expect most people to interact with P
 ## Configuration Finding
 
 In both project checking mode and single-file checking mode (see [Type Checking Modes](#type-checking-modes)
-for more info), we may perform an upward file search to find a
-configuration file if one is not provided with `-c`/`--config`. We each directory
-from the 'start location' to the filesystem root, looking first for `pyrefly.toml` then `pyproject.toml`, in
-the same directory before looking at its parent.
+for more info), we attempt to find a *project root* from which to check each file, both for reading
+config options and for import resolution  (see [Import Root](./import-resolution.mdx#import-root)). The
+project root is typically the directory containing the configuration file. More precisely:
+
+1. If a configuration file is provided with `-c`/`--config`, we use its containing directory.
+1. Otherwise, we perform an upward file search from the 'start location' to the filesystem root,
+   looking in each directory for any of the following files: `pyrefly.toml`, `pyproject.toml`,
+   `setup.py`, `mypy.ini`, and `pyrightconfig.json`. If we find one, we use the current directory.
+
+Note that only `pyrefly.toml` and `pyproject.toml` are parsed for config options, but we look for
+additional files that mark the root of a project to aid import resolution.
 
 For project checking mode, the 'start location' is current working directory. For single-file checking mode,
 the start location is the directory containing each file to be type checked, and
-we find the config for each file matched by the pattern provided. No
-config flag can be passed into Pyrefly in single file checking mode, since the behavior
-is very ambiguous (would we apply the given config to each file? should the config
-override all settings, or just some of them?, ...).
+we find the config for each file matched by the pattern provided.
 
 If a `pyrefly.toml` is found, it is parsed and used for type checking, and will
 return an error to the user on invalid types, syntax, values, or unknown config options.
@@ -111,6 +114,12 @@ If a `pyproject.toml` is found, Pyrefly will use the `[tool.pyrefly]`
 section if it exists, otherwise it will assume a default config.
 The same errors will be returned as when loading a `pyrefly.toml` if
 the config is invalid.
+
+### Providing a Config in Single-File Mode
+
+Providing `-c`/`--config` in single-file checking mode disables the upward file search for config
+files. All options are read from the provided config file except `project_includes` and
+`project_excludes`, which are ignored.
 
 ## Configuration Options
 
@@ -171,12 +180,12 @@ type checked file is imported by another type checked file, we check all search 
 determine how to import it.
 
 - Type: list of directories specifying the root
-- Default: `["."]`
+- Default: [import root](./import-resolution.mdx#import-root)
 - Flag equivalent: `--search-path`
 - ENV equivalent: `PYREFLY_SEARCH_PATH`
 - Equivalent configs: `extraPaths` in Pyright, `mypy_path` in mypy
 - Notes:
-  - We automatically append `"."` (the directory containing the
+  - We automatically append an import root (typically the directory containing the
     configuration file) to the `search_roots` when type checking as a sensible
     default and last attempt at an import.
   - Libraries should not be listed here, since they may override `typeshed`
@@ -1059,9 +1068,8 @@ directory, and more dots (e.g. `..other.file`) will continue to walk upward.
 For absolute imports, Pyrefly uses the following import strategy:
 
 1. Try to import from each entry in [`search_path`](./configuration.mdx#search_path) in the order they appear
-   using the module finding strategy. a. NOTE: we append the config file's
-   directory to `search_path` automatically when using a config file as a
-   sensible last-resort for attempting an import.
+   using the module finding strategy. a. NOTE: we append an [import root](#import-root) to `search_path`
+   automatically when using a config file as a sensible last-resort for attempting an import.
 2. Try to import from `typeshed`.
 3. Try to find a stub package corresponding to the import we're trying to resolve in
    [`site_package_path`](./configuration.mdx#site_package_path).
@@ -1076,6 +1084,17 @@ For absolute imports, Pyrefly uses the following import strategy:
 See [Site Package Path Typing Rules](#site-package-path-typing-rules) for more information about which
 modules are valid imports from [`site_package_path`](./configuration.mdx#site_package_path), and
 how to override that behavior.
+
+### Import Root
+
+Pyrefly automatically appends an *import root* to the search path. This is the directory that
+importable Python packages live in, determined from the
+[project root](./configuration.mdx#configuration-finding) and layout.
+Pyrefly auto-detects import roots for two common project layouts:
+
+* Src layout, assumed when there is a `src/` directory directly inside the project root. `src/` is
+  the import root.
+* Flat layout, the default. The project root is the import root.
 
 ### Site Package Path Typing Rules
 
@@ -1117,6 +1136,12 @@ imports by first searching for a relevant `-stubs` package, then by looking at
 the non-stubs package's `.pyi` files, then falls back to a `.py` file. See
 [Absolute Imports](#absolute-imports) for details on when non-stubs packages
 are allowed to be used for types, and how you can override that behavior.
+
+## Debugging Import Issues
+
+Pyrefly has a `dump-config` command that dumps the import-related config options it is using for
+each file it is checking. To use it, simply replace `check` with `dump-config` in your
+command-line invocation.
 
 
 ---
@@ -1652,7 +1677,7 @@ Default values keep their annotation:
 
 <pre>
   <SandboxBrowserOnly
-  sampleFilename="defaul_value_types.py"
+  sampleFilename="default_value_types.py"
   isCodeSnippet={true}
   codeSample={`# Function with default value
 
@@ -1683,7 +1708,7 @@ def debug(*msgs: str, log: Logger | None = print) -> None:
   />
 </pre>
 
-## 5. Get Type Hint Signals Directly in Your Editor
+## 6. Get Type Hint Signals Directly in Your Editor
 
 You can download the [Pyrefly extension for VSCode](https://marketplace.visualstudio.com/items?itemName=meta.pyrefly) to get type hint signals directly in your IDE.
 
@@ -1719,7 +1744,7 @@ import SandboxBrowserOnly from '@site/src/sandbox/SandboxBrowserOnly'
 
 If you are new to Python, check out our [Python Typing for Beginners guide](../python-typing-for-beginners/).
 
-Python's type system allow you to annotate variables so you, your teammates and your type checker can find bugs before you run your code. Think of it as documentation that's automatically validated and will help your IDE help you.
+Python's type system allows you to annotate variables so you, your teammates and your type checker can find bugs before you run your code. Think of it as documentation that's automatically validated and will help your IDE help you.
 
 _TL;DR_
 * Catch bugs **before** running the code.
@@ -1816,7 +1841,7 @@ Defining the parameter and return types for a function doesn't just help prevent
 from typing import reveal_type
 
 def greet(name: str) -> str:
-    return f"Hello , {name}!"
+    return f"Hello, {name}!"
 
 greet("Pyrefly")
 
