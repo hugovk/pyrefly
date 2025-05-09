@@ -1,0 +1,83 @@
+name: test_extension
+on:
+  workflow_dispatch:
+  workflow_call:
+  push:
+
+jobs:
+  test_extension:
+    needs: get_version
+    if: success()
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win32
+            arch: x64
+          - os: windows-latest
+            platform: win32
+            arch: arm64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+          - os: ubuntu-latest
+            platform: linux
+            arch: arm64
+          - os: ubuntu-latest
+            container: ubuntu:20.04
+            platform: linux
+            arch: armhf
+          - os: ubuntu-latest
+            platform: alpine
+            arch: x64
+          - os: ubuntu-latest
+            platform: alpine
+            arch: arm64
+          - os: macos-13
+            platform: darwin
+            arch: x64
+          - os: macos-14
+            platform: darwin
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: download built vsix
+        uses: actions/download-artifact@v4
+      # use the binary from the built extension
+      - name: Rename .vsix to .zip
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            ren *.vsix *.zip
+          else
+            mv *.vsix *.zip
+          fi
+        shell: bash
+      - name: Extract .zip file
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            powershell -Command "Expand-Archive -Path *.zip -DestinationPath extracted"
+          else
+            unzip *.zip -d extracted
+          fi
+        shell: bash
+      - name: Copy extracted files to lsp/bin
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            xcopy /E /I /Y extracted\bin\* lsp\bin\
+          else
+            cp -r extracted/bin/* lsp/bin/
+          fi
+        shell: bash
+      # Now run the test
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: save platform name
+        run: echo "platform=${{ matrix.platform }}-${{ matrix.arch }}" >> ${{ matrix.github_env }}
+      - run: npm ci
+        working-directory: lsp/
+      - run: npm run compile
+        working-directory: lsp/
+      - run: npm run test
+        working-directory: lsp/
