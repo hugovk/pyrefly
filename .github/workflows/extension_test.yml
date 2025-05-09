@@ -25,7 +25,6 @@ jobs:
             platform: linux
             arch: arm64
           - os: ubuntu-latest
-            container: ubuntu:20.04
             platform: linux
             arch: armhf
           - os: ubuntu-latest
