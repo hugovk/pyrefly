@@ -157,7 +157,7 @@ type checking as way to filter files that match `project_includes`,
 but we don't want to type check.
 
 - Type: list of [filesystem glob patterns](#filesystem-globbing)
-- Default: `["**/__pycache__/**", "**/.[!/.]*"]`
+- Default: `["**/.[!/.]*"]`
 - Flag equivalent: `--project-excludes`
 - Equivalent configs: `exclude` in Pyright and mypy
 - Notes:
@@ -450,6 +450,7 @@ that can apply to a given file when the `matches` glob pattern matches.
 We currently allow the following config options to be overridden in a `SubConfig`:
 - `errors`
 - `replace_imports_with_any`
+- `untyped_def_behavior`
 - `ignore_errors_in_generated_code`
 
 All `SubConfig` overrides *replace* the values appearing in the 'root' or top-level of the
@@ -516,8 +517,8 @@ interpreter installed, some of these values may be overridden.
 
 # check all files in "."
 project_includes = ["."]
-# exclude pycache and dotfiles
-project_excludes = ["**/__pycache__/**", "**/.[!/.]*"]
+# exclude dotfiles
+project_excludes = ["**/.[!/.]*"]
 # import project files from "."
 search_path = ["."]
 # do not include any third-party packages
@@ -550,7 +551,7 @@ ignore_missing_source = false
 
 ```toml
 project_includes = ["src"]
-project_excludes = ["**/__pycache__/**", "**/.[!/.]*", "**/tests"]
+project_excludes = ["**/.[!/.]*", "**/tests"]
 search_path = ["src"]
 site_package_path = ["venv/lib/python3.12/site-packages"]
 
@@ -639,7 +640,7 @@ With the above config, here are the actual config values some files would use:
 
 #### configuring what to type check and where to import from
 project_includes = ["src"]
-project_excludes = ["**/__pycache__/**", "**/.[!/.]*", "**/tests"]
+project_excludes = ["**/.[!/.]*", "**/tests"]
 search_path = ["src"]
 site_package_path = ["venv/lib/python3.12/site-packages"]
 
@@ -1150,7 +1151,7 @@ title: Introduction
 description: Guides and references for all you need to know about Pyrefly
 ---
 
-import SandboxBrowserOnly from '@site/src/sandbox/SandboxBrowserOnly'
+import CodeSnippet from '@site/src/sandbox/CodeSnippet'
 
 Pyrefly is a static typechecker for Python that helps you catch type-related errors before your code runs. It analyzes your Python code to ensure type consistency throughout your codebase, making your applications more reliable and easier to maintain. Pyrefly supports both IDE integration and CLI usage, giving you flexibility in how you incorporate type checking into your workflow.
 
@@ -1168,11 +1169,9 @@ Adding type annotations to your Python code and using a typechecker like Pyrefly
 
 Here's a simple example showing how Pyrefly can catch type errors:
 
-<pre>
-  <SandboxBrowserOnly
-    sampleFilename="getting_started.py"
-    isCodeSnippet={true}
-    codeSample={`# Example: Basic Type Checking
+<CodeSnippet
+  sampleFilename="getting_started.py"
+  codeSample={`# Example: Basic Type Checking
 
 def greet(name: str) -> str:
     return "Hello, " + name
@@ -1184,8 +1183,7 @@ message = greet("World")
 # Error: Argument of type 'int' is not assignable to parameter of type 'str'
 error_message = greet(42)
 `}
-  />
-</pre>
+/>
 
 In this example, Pyrefly flags the second call to `greet()` because we're passing an integer (`42`) where a string is expected, helping you catch this issue before your code runs. To learn more about Python typing and how to use it effectively, check out our [Python Typing for Beginners](python-typing-for-beginners) page.
 
@@ -1532,7 +1530,7 @@ title: Python Typing for Beginners
 description: A gentle, example‑driven introduction to static type hints in Python.
 ---
 
-import SandboxBrowserOnly from '@site/src/sandbox/SandboxBrowserOnly'
+import CodeSnippet from '@site/src/sandbox/CodeSnippet'
 
 # Python Typing for Beginners
 
@@ -1562,10 +1560,8 @@ _TL;DR_
 * Turn your code into living documentation.
 
 
-<pre>
-  <SandboxBrowserOnly
+<CodeSnippet
   sampleFilename="why_hints.py"
-  isCodeSnippet={true}
   codeSample={`# Without hints – is "times" a str, int, or list?
 def repeat(text, times):
     return text * times
@@ -1574,8 +1570,7 @@ def repeat(text, times):
 def repeat(text: str, times: int) -> str:
     return text * times
 `}
-  />
-</pre>
+/>
 
 
 ### Can you spot the bug?
@@ -1599,10 +1594,8 @@ print(area)
 
 **Spelling is hard!** Let's add the `dataclass` decorator to our class definition. This will generate a constructor for us, and also add a few other useful methods.
 
-<pre>
-  <SandboxBrowserOnly
+<CodeSnippet
   sampleFilename="misspelled.py"
-  isCodeSnippet={true}
   codeSample={`#Pyrefly will catch this spelling error before you run the code
 from dataclasses import dataclass
 
@@ -1615,32 +1608,26 @@ rect = Rectangle(width=100, height=50)
 
 area = rect.width * rect.hieght
 `}
-  />
-</pre>
+/>
 
 
 ## 3. Primitive Types
 
 Since Python 3.9 you can use all the [primitive types](https://docs.python.org/3/library/stdtypes.html) directly as annotations.
 
-<pre>
-  <SandboxBrowserOnly
+<CodeSnippet
   sampleFilename="primitives_types.py"
-  isCodeSnippet={true}
   codeSample={`age: int = 30
 height: float = 1.85
 name: str = "Tyler Typer"
 is_admin: bool = False
 `}
 />
-</pre>
 
 You can also specify a parameter as optional by using `Optional` type, or now with the `| None` syntax.
 
-<pre>
-  <SandboxBrowserOnly
+<CodeSnippet
   sampleFilename="primitive2_types.py"
-  isCodeSnippet={true}
   codeSample={`# Optional typing example
 
 from typing import Optional
@@ -1649,7 +1636,6 @@ middle_name: Optional[str] = None        # classic
 nickname: str | None = None              # 3.10+ shorthand
 `}
 />
-</pre>
 
 ## 4. Collections
 
@@ -1662,36 +1648,28 @@ nickname: str | None = None              # 3.10+ shorthand
 Since Python 3.9 you can subscript built‑ins directly—no need for `from typing import List`.
 
 ## 5. Functions
-<pre>
-  <SandboxBrowserOnly
+<CodeSnippet
   sampleFilename="basic_function_types.py"
-  isCodeSnippet={true}
   codeSample={`# Simple function
 def add(a: int, b: int) -> int:
     return a + b
   `}
-  />
-</pre>
+/>
 Default values keep their annotation:
 
-<pre>
-  <SandboxBrowserOnly
+<CodeSnippet
   sampleFilename="default_value_types.py"
-  isCodeSnippet={true}
   codeSample={`# Function with default value
 
 
 def greet(name: str, polite: bool = True) -> str:
     return "Hello!" if polite else f"Yo {name}"
     `}
-  />
-</pre>
+/>
 Variable‑length arguments:
 
-<pre>
-  <SandboxBrowserOnly
+<CodeSnippet
   sampleFilename="variable_length_types.py"
-  isCodeSnippet={true}
   codeSample={`# Variable length functions
 from collections.abc import Callable
 
@@ -1704,8 +1682,7 @@ def debug(*msgs: str, log: Logger | None = print) -> None:
     else:
       print(m)
     `}
-  />
-</pre>
+/>
 
 ## 6. Get Type Hint Signals Directly in Your Editor
 
@@ -1733,13 +1710,13 @@ title: Typing for Python Developers
 description: Get to know Python's Type System with working examples
 ---
 
-import SandboxBrowserOnly from '@site/src/sandbox/SandboxBrowserOnly'
+import CodeSnippet from '@site/src/sandbox/CodeSnippet'
 
-# Typing for Python Developers
+# Typing for Python Developers
 
 *5‑Minute Tour with Pyrefly*
 
-**Goal:** In five minutes you’ll know how Python’s static type system _infers_, _defines_, and _composes_ types—and you’ll have copy‑paste snippets to start using right away.
+**Goal:** In five minutes you'll know how Python's static type system _infers_, _defines_, and _composes_ types—and you'll have copy‑paste snippets to start using right away.
 
 If you are new to Python, check out our [Python Typing for Beginners guide](../python-typing-for-beginners/).
 
@@ -1754,10 +1731,8 @@ _TL;DR_
 
 Static analyzers can often _infer_ types from your code—no annotations required. Pyrefly takes this a step further.
 
-<pre>
-  <SandboxBrowserOnly
+<CodeSnippet
   sampleFilename="basic_inference.py"
-  isCodeSnippet={true}
   codeSample={`# Basic Inference
 answer = 42
 reveal_type(answer) # hover to reveal type
@@ -1770,23 +1745,19 @@ def greet(name):
 
 message = greet("World")
 `}
-  />
-</pre>
+/>
 
 ### Where Inference Shines ✨
-- Constant assignments (`answer = 42 -> int`)
-- List/tuple/dict literals with uniform elements (`names = ["A", "B"] -> list[str]`)
+- Constant assignments (`answer = 42 -> int`)
+- List/tuple/dict literals with uniform elements (`names = ["A", "B"] -> list[str]`)
 - Return types if parameter types are annotated:
 
-<pre>
-  <SandboxBrowserOnly
+<CodeSnippet
   sampleFilename="return_inference.py"
-  isCodeSnippet={true}
   codeSample={`def add(a: int, b: int):   # ✅ param annotations
-    return a + b    # 🔍 return inferred -> int
+    return a + b    # 🔍 return inferred -> int
 `}
-  />
-</pre>
+/>
 
 ### When to Add Hints
 - Public APIs (library or service boundaries)
@@ -1798,10 +1769,8 @@ message = greet("World")
 ### The Basics
 
 Python's built-in types can be used to write many simple type hints.
-<pre>
-  <SandboxBrowserOnly
+<CodeSnippet
   sampleFilename="built_in_types.py"
-  isCodeSnippet={true}
   codeSample={`# Example: Basic Types
 
 from typing import reveal_type
@@ -1826,15 +1795,12 @@ reveal_type(person) # revealed type: dict[str, str]
 is_admin: bool = True
 reveal_type(is_admin) # revealed type: Literal[True]
 `}
-  />
-</pre>
+/>
 
 ### Functions
 Defining the parameter and return types for a function doesn't just help prevent bugs, but it makes it easier to navigate in other files. You don't always need to define a return type - we'll do our best to infer it for you! We can't always get it right and an explicit return type will help your IDE navigate faster and more accurately.
-<pre>
-  <SandboxBrowserOnly
+<CodeSnippet
   sampleFilename="functions_types.py"
-  isCodeSnippet={true}
   codeSample={`# Example: Functions
 
 from typing import reveal_type
@@ -1849,19 +1815,16 @@ def whatDoesThisFunctionReturnAgain(a: int, b: int):
 
 reveal_type(whatDoesThisFunctionReturnAgain(2, 3)) # revealed type: int
 `}
-  />
-</pre>
+/>
 
 ## Advanced Types
 
 ### Composing Types
 The real power comes from composing smaller pieces into richer shapes.
 
-### Unions & Optional
-<pre>
-  <SandboxBrowserOnly
+### Unions & Optional
+<CodeSnippet
   sampleFilename="unions_types.py"
-  isCodeSnippet={true}
   codeSample={`# Union and Optional Types
 
 from typing import Optional
@@ -1873,18 +1836,15 @@ def to_int(data: str | bytes | None) -> Optional[int]:
         data = data.decode()
     return int(data)
 `}
-  />
-</pre>
+/>
 
 ### Generics
 
 Generics allow you to define reusable functions and classes that work with multiple types. This feature enables you to write more flexible and adaptable code.
 
-<pre>
-  <SandboxBrowserOnly
-    sampleFilename="generics.py"
-    isCodeSnippet={true}
-    codeSample={`# Example: Generic Classes
+<CodeSnippet
+  sampleFilename="generics.py"
+  codeSample={`# Example: Generic Classes
 
 from typing import reveal_type
 
@@ -1897,18 +1857,15 @@ class C[T]:
 c = C(0)
 reveal_type(c.box())  # revealed type: list[int]
 `}
-  />
-</pre>
+/>
 
 ### Protocols
 
 Protocols enable structural typing, which allows you to define interfaces without explicit inheritance. This feature helps you write more modular and composable code.
 
-<pre>
-  <SandboxBrowserOnly
-    sampleFilename="protocols.py"
-    isCodeSnippet={true}
-    codeSample={`# Example: Structural Typing with Protocols
+<CodeSnippet
+  sampleFilename="protocols.py"
+  codeSample={`# Example: Structural Typing with Protocols
 
 from typing import Iterable, Protocol
 
@@ -1928,8 +1885,7 @@ def f(writer: Writer):
 f(GoodWorld()) # OK
 f(BadWorld())  # ERROR!
 `}
-  />
-</pre>
+/>
 
 ## Structural Types
 Python also employs a structural type system, often referred to as "duck typing." This concept is based on the idea that if two objects have the same shape or attributes, they can be treated as being of the same type.
@@ -1938,11 +1894,9 @@ Python also employs a structural type system, often referred to as "duck typing.
 
 Dataclasses allow you to create type-safe data structures while minimizing boilerplate.
 
-<pre>
-  <SandboxBrowserOnly
-    sampleFilename="data_classes.py"
-    isCodeSnippet={true}
-    codeSample={`# Example: Dataclasses
+<CodeSnippet
+  sampleFilename="data_classes.py"
+  codeSample={`# Example: Dataclasses
 
 from dataclasses import dataclass
 
@@ -1954,19 +1908,16 @@ class Point:
 Point(x=0.0, y=0.0)    # OK
 Point(x=0.0, y="oops") # ERROR!
 `}
-  />
-</pre>
+/>
 
 
 ### TypedDict
 
 Typed dictionaries enable you to define dictionaries with specific key-value types. This feature lets you bring type safety to ad-hoc dictionary structures without major refactoring.
 
-<pre>
-  <SandboxBrowserOnly
-    sampleFilename="typed_dict.py"
-    isCodeSnippet={true}
-    codeSample={`# Example: TypedDict
+<CodeSnippet
+  sampleFilename="typed_dict.py"
+  codeSample={`# Example: TypedDict
 
 from typing import TypedDict
 
@@ -1977,18 +1928,15 @@ class Movie(TypedDict):
 good_movie: Movie = {"name": "Toy Story", "year": 1995} # OK
 bad_movie: Movie = {"name": "The Room", "year": "2003"}  # ERROR!
 `}
-  />
-</pre>
+/>
 
 ### Overloads
 
 Overloads allow you to define multiple function signatures for a single function. Like generics, this feature helps you write more flexible and adaptable code.
 
-<pre>
-  <SandboxBrowserOnly
-    sampleFilename="overloads.py"
-    isCodeSnippet={true}
-    codeSample={`# Example: Overloads
+<CodeSnippet
+  sampleFilename="overloads.py"
+  codeSample={`# Example: Overloads
 
 from typing import overload, reveal_type
 
@@ -2004,33 +1952,32 @@ def f(x: int | str) -> int | str:
 reveal_type(f(0))  # revealed type: int
 reveal_type(f("")) # revealed type: str
 `}
-  />
-</pre>
+/>
 
 ## Typing Features, PEPS available in each Python Version
 
-| Feature (click PEP for details) | What it adds / looks like | Introduced in |
+| Feature (click PEP for details) | What it adds / looks like | Introduced in |
 | --- | --- | --- |
-| [PEP 484](https://peps.python.org/pep-0484/) -- Core **type hints** & `typing` module | `def add(a: int, b: int) -> int:` | **3.5** |
-| [PEP 526](https://peps.python.org/pep-0526/) -- **Variable annotations** | `count: int = 0` | **3.6** |
-| [PEP 563](https://peps.python.org/pep-0563/) -- `from __future__ import annotations` (lazy eval) | Annotations stored as **strings** | **3.7** (future‑flag) |
-| [PEP 544](https://peps.python.org/pep-0544/) -- **Protocols** (structural typing) | `class Jsonable(Protocol): ...` | **3.8** |
-| [PEP 589](https://peps.python.org/pep-0589/) -- **TypedDict** | `class User(TypedDict): ...` | **3.8** |
-| [PEP 586](https://peps.python.org/pep-0586/) -- **Literal** types | `def log(level: Literal["info","warn"]): ...` | **3.8** |
-| [PEP 591](https://peps.python.org/pep-0591/) -- **Final** qualifier | `TOKEN: Final[str] = "..."` | **3.8** |
-| [PEP 585](https://peps.python.org/pep-0585/) -- **Built‑in generics** | `list[int]`, `dict[str, Any]` | **3.9** |
-| [PEP 593](https://peps.python.org/pep-0593/) -- **Annotated** | `x: Annotated[int, "units=px"]` | **3.9** |
-| [PEP 604](https://peps.python.org/pep-0604/) -- **Union** syntax | `int \| None` | **3.10** |
-| [PEP 612](https://peps.python.org/pep-0612/) -- **ParamSpec / Concatenate** | decorator‑safe generics | **3.10** |
-| [PEP 613](https://peps.python.org/pep-0613/) -- `TypeAlias` qualifier | `Vector: TypeAlias = list[float]` | **3.10** |
-| [PEP 647](https://peps.python.org/pep-0647/) -- **TypeGuard** for narrowing | `def is_str(x) -> TypeGuard[str]: ...` | **3.10** |
-| [PEP 655](https://peps.python.org/pep-0655/) -- `Required` / `NotRequired` for **TypedDict** | optional vs. mandatory keys | **3.11** |
-| [PEP 646](https://peps.python.org/pep-0646/) -- **Variadic generics** (`TypeVarTuple`, `Unpack`) | tensor shapes, 2‑D arrays, ... | **3.11** |
-| [PEP 673](https://peps.python.org/pep-0673/) -- **Self** type | fluent APIs: `def set(...) -> Self:` | **3.11** |
-| [PEP 681](https://peps.python.org/pep-0681/) -- **dataclass_transform** helper | libraries like Pydantic, attrs | **3.11** |
-| [PEP 695](https://peps.python.org/pep-0695/) -- **Class‑level generics syntax** | `class Box[T]: ...` | **3.12** |
-| [PEP 649](https://peps.python.org/pep-0649/) -- *New* deferred‑eval algorithm (replaces PEP 563) | becomes the default | **3.13** |
-| [PEP 698](https://peps.python.org/pep-0698/) -- `@override` decorator | flag intentional overrides | **3.13** (planned) |
+| [PEP 484](https://peps.python.org/pep-0484/) -- Core **type hints** & `typing` module | `def add(a: int, b: int) -> int:` | **3.5** |
+| [PEP 526](https://peps.python.org/pep-0526/) -- **Variable annotations** | `count: int = 0` | **3.6** |
+| [PEP 563](https://peps.python.org/pep-0563/) -- `from __future__ import annotations` (lazy eval) | Annotations stored as **strings** | **3.7** (future‑flag) |
+| [PEP 544](https://peps.python.org/pep-0544/) -- **Protocols** (structural typing) | `class Jsonable(Protocol): ...` | **3.8** |
+| [PEP 589](https://peps.python.org/pep-0589/) -- **TypedDict** | `class User(TypedDict): ...` | **3.8** |
+| [PEP 586](https://peps.python.org/pep-0586/) -- **Literal** types | `def log(level: Literal["info","warn"]): ...` | **3.8** |
+| [PEP 591](https://peps.python.org/pep-0591/) -- **Final** qualifier | `TOKEN: Final[str] = "..."` | **3.8** |
+| [PEP 585](https://peps.python.org/pep-0585/) -- **Built‑in generics** | `list[int]`, `dict[str, Any]` | **3.9** |
+| [PEP 593](https://peps.python.org/pep-0593/) -- **Annotated** | `x: Annotated[int, "units=px"]` | **3.9** |
+| [PEP 604](https://peps.python.org/pep-0604/) -- **Union** syntax | `int \| None` | **3.10** |
+| [PEP 612](https://peps.python.org/pep-0612/) -- **ParamSpec / Concatenate** | decorator‑safe generics | **3.10** |
+| [PEP 613](https://peps.python.org/pep-0613/) -- `TypeAlias` qualifier | `Vector: TypeAlias = list[float]` | **3.10** |
+| [PEP 647](https://peps.python.org/pep-0647/) -- **TypeGuard** for narrowing | `def is_str(x) -> TypeGuard[str]: ...` | **3.10** |
+| [PEP 655](https://peps.python.org/pep-0655/) -- `Required` / `NotRequired` for **TypedDict** | optional vs. mandatory keys | **3.11** |
+| [PEP 646](https://peps.python.org/pep-0646/) -- **Variadic generics** (`TypeVarTuple`, `Unpack`) | tensor shapes, 2‑D arrays, ... | **3.11** |
+| [PEP 673](https://peps.python.org/pep-0673/) -- **Self** type | fluent APIs: `def set(...) -> Self:` | **3.11** |
+| [PEP 681](https://peps.python.org/pep-0681/) -- **dataclass_transform** helper | libraries like Pydantic, attrs | **3.11** |
+| [PEP 695](https://peps.python.org/pep-0695/) -- **Class‑level generics syntax** | `class Box[T]: ...` | **3.12** |
+| [PEP 698](https://peps.python.org/pep-0698/) -- `@override` decorator | flag intentional overrides | **3.13** |
+| [PEP 649](https://peps.python.org/pep-0649/) -- *New* deferred‑eval algorithm (replaces PEP 563) | becomes the default | **3.14** |
 
 ### Key Highlights Summary:
 - **Inference:** Python's static analyzers can infer types from your code, reducing the need for explicit annotations. This feature enhances code readability and helps catch bugs early.
