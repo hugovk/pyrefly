@@ -17,12 +17,15 @@ The Pyrefly extension provides:
 - Types shown inline and on hover
 - Go-to definition
 - Autocomplete / intellisense
+- Basic document symbols / breadcrumbs
+- Find references
 
 ## Customization
 By default, Pyrefly should work in the IDE with no configuration necessary. But to ensure your project is set up properly, see [configurations](../configuration).
 
-The following configuration options are IDE-specific:
-- `python.pyrefly.disableLanguageServices` [boolean: false]: by default, Pyrefly will provide both type errors and other language features like go-to definition, intellisense, hover, etc. Enable this option to keep type errors from Pyrefly but use VSCode's Python extension for everything else.
+The following configuration options are IDE-specific and exposed as VSCode settings:
+- `python.pyrefly.disableLanguageServices` [boolean: false]: by default, Pyrefly will provide both type errors and other language features like go-to definition, intellisense, hover, etc. Enable this option to keep type errors from Pyrefly unchanged but use VSCode's Python extension for everything else.
+- `python.pyrefly.disableTypeErrors` [boolean: false]: by default, Pyrefly will provide type errors in your project. Enable this setting to disable type error squiggles appearing in the editor.
 
 If the project configuration does not specify the Python interpreter, Pyrefly will use the [interpreter selected in VSCode](https://code.visualstudio.com/docs/python/environments).
 
@@ -32,8 +35,55 @@ If you experience issues with the Pyrefly extension, please create an [issue](ht
 ## Other Editors
 Support for other editors is community-driven. If you would like to set this up, please contribute.
 
-- An unofficial Jetbrains extension has been developed [here](https://plugins.jetbrains.com/plugin/26829-pyrefly)
-- For Neovim support, see the issue [here](https://github.com/facebook/pyrefly/issues/55)
+### Jetbrains
+An unofficial Jetbrains extension has been developed [here](https://plugins.jetbrains.com/plugin/26829-pyrefly)
+
+### Neovim + `lspconfig`
+With the `lspconfig` [plugin](https://github.com/neovim/nvim-lspconfig) and `uv` installed, you can use this configuration:
+```lua
+local lspconfig = require("lspconfig")
+local configs = require("lspconfig.configs")
+
+if not configs.pyrefly then
+  configs.pyrefly = {
+      cmd = { "uv", "run", "pyrefly", "lsp" },
+      filetypes = { "python" },
+      root_dir = function(fname)
+        return lspconfig.util.find_git_ancestor(fname) or vim.loop.os_homedir()
+      end,
+      settings = {},
+    },
+end
+
+lspconfig.pyrefly.setup({})
+```
+
+### Neovim 0.11+
+Place the following file under `~/.config/nvim/lsp`
+```lua
+return {
+  cmd = { "pyrefly", "lsp" },
+  filetypes = { "python" },
+  settings = {},
+  on_exit = function(code, _, _)
+    vim.notify("Closing Pyrefly LSP exited with code: " .. code, vim.log.levels.INFO)
+  end,
+}
+```
+Then enable it in `init.lua`:
+```lua
+vim.lsp.enable({"pyrefly"})
+```
+
+### Vim + Ale
+Once [this](https://github.com/dense-analysis/ale/pull/4972) gets merged, you will only need:
+```
+let g:ale_linters = {
+    ...
+  \ 'python': ['pyrefly'],
+    ...
+  \ }
+```
 
 
 ---
@@ -348,6 +398,36 @@ type stubs could be found. See
 - Flag equivalent: none
 - ENV equivalent: none
 - Equivalent configs: `reportMissingModuleSource` in Pyright
+
+### `untyped_def_behavior`
+
+How should Pyrefly treat function definitions with no parameter or return type annotations?
+
+By default, Pyrefly uses the `"check-and-infer-return-type"` behavior and will
+check all function bodies inferring the return type.
+
+If this option is set to `"check-and-infer-return-any"`, then Pyrefly will still
+check the function body but will treat the return type as `Any`.
+
+If this option is set to `"skip-and-infer-return-any"`, Pyrefly will again treat
+the return type as `Any`, but will also skip checking the function body. In this
+case, Pyrefly will also infer `Any` as the type of any attributes inferred based
+on this function body. This behavior is what PEP 484 specifies, although we do
+not recommend it for most users today; since Pyrefly will not analyze the bodies
+of untyped functions, language server functionality like showing types on hover
+and finding definitions will not be available there.
+
+- Type: one of `"check-and-infer-return-type"`, `"check-and-infer-return-any"`,
+  `"skip-and-infer-return-any"`
+- Default: `"check-and-infer-return-type"
+- Flag equivalent: none
+- ENV equivalent: none
+- Equivalent configs:
+  - The `"check-and-infer-return-type"` behavior emulates Pyright's default
+    behavior.
+  - The `"skip-and-infer-return-any"` behavior emulates mypy's default behavior.
+  - The `"check-and-infer-return-any"` behavior emulates mypy's
+    `check_untyped_defs` flag.
 
 ### `sub_config`
 
@@ -1024,8 +1104,78 @@ title: Error Suppressions
 
 description: How to suppress errors in Pyrefly
 ---
+import CodeSnippet from '@site/src/sandbox/CodeSnippet'
 
-INFO TO BE ADDED
+The Python type system allows you to suppress errors with a comment. This feature can be helpful in many scenarios. For example, after enabling a type checker, suppressions can allow you to get a clean type check signal without having to stop and fix every pre-existing error in your code.
+
+There are mutliple ways to do this in Pyrefly.
+
+```python
+def foo() -> int:
+  # pyrefly: ignore
+  return "this is a type error"
+```
+
+You can also put the comment on the same line as the error.
+
+```python
+def foo() -> int:
+  return "this is a type error" # pyrefly: ignore
+```
+
+We respect the specification and allow `type: ignore` to be used:
+
+```python
+def foo() -> int:
+  return "this is a type error" # type: ignore
+```
+
+
+We also have a special comment that will ignore all errors in a file.
+
+
+<pre>
+  <CodeSnippet
+  sampleFilename="why_hints.py"
+  isCodeSnippet={true}
+  codeSample={`# pyrefly: ignore-all-errors
+
+from typing import *
+
+
+def test(x: int):
+  return f"{x}"
+
+def bar() -> int:
+    # this error won't be reported
+    return ""
+`}
+  />
+</pre>
+
+
+----
+## Upgrading Pyrefly (And other changes that introduce new type errors)
+
+Upgrading the version of Pyrefly you're using, or a third party library you depend on can surface new type errors in your code. Fixing them all at once is often not realistic. We've written scripts to help you temporarily silence them.
+
+```
+# step 1
+pyrefly check --suppress-errors
+```
+
+```
+# step 2
+<run your formatter of choice>
+```
+
+```
+# step 3
+pyrefly check --remove-unused-ignores
+```
+Repeat the steps above until you get a clean fomatting run and a clean type check.
+
+This will add ` # pyrefly: ignore` comments to your code that will enable you to silence errors, and come back and fix them at a later date. This can make the process of upgrading a large codebase much more manageable.
 
 
 ---
@@ -1153,16 +1303,16 @@ description: Guides and references for all you need to know about Pyrefly
 
 import CodeSnippet from '@site/src/sandbox/CodeSnippet'
 
-Pyrefly is a static typechecker for Python that helps you catch type-related errors before your code runs. It analyzes your Python code to ensure type consistency throughout your codebase, making your applications more reliable and easier to maintain. Pyrefly supports both IDE integration and CLI usage, giving you flexibility in how you incorporate type checking into your workflow.
+Pyrefly is a static type checker for Python that helps you catch type-related errors before your code runs. It analyzes your Python code to ensure type consistency throughout your codebase, making your applications more reliable and easier to maintain. Pyrefly supports both IDE integration and CLI usage, giving you flexibility in how you incorporate type checking into your workflow.
 
 ## Benefits of Type Checking
 
-Adding type annotations to your Python code and using a typechecker like Pyrefly provides several important benefits:
+Adding type annotations to your Python code and using a type checker like Pyrefly provides several important benefits:
 
 - **Catch bugs early** - Identify type-related errors during development rather than at runtime
 - **Improve code quality** - Type annotations serve as living documentation, making your code more readable and self-documenting
 - **Enhance developer experience** - Get better IDE support with accurate autocomplete, refactoring tools, and inline documentation
-- **Safer refactoring** - Make large-scale changes with confidence, knowing the typechecker will catch incompatible type usage
+- **Safer refactoring** - Make large-scale changes with confidence, knowing the type checker will catch incompatible type usage
 - **Better collaboration** - Types create clear contracts between different parts of your codebase, making it easier for teams to work together
 
 ## Try Pyrefly
@@ -1193,7 +1343,7 @@ Ready to get started with Pyrefly? Check out these resources:
 
 - [Installation Guide](./installation) - Install and set up Pyrefly for your project
 - [IDE Integration](./IDE) - Use Pyrefly in your favorite editor
-- [Python Typing for Beginners](./python-typing-for-beginners) - Master the basics of Python's type system
+- [Python Typing for New Developers](./python-typing-for-beginners) - Master the basics of Python's type system
 - [Frequently Asked Questions](./pyrefly-faq) - Common questions about Pyrefly
 
 ## Configuration
@@ -1202,11 +1352,11 @@ Once you've installed Pyrefly, you can customize its behavior:
 
 - [Configuration Guide](./configuration) - Configure Pyrefly for your project's specific needs
 
-## Migrating from Other Typecheckers
+## Migrating from Other Type Checkers
 
-If you're currently using a different Python typechecker, we have guides to help you migrate to Pyrefly:
+If you're currently using a different Python type checker, we have guides to help you migrate to Pyrefly:
 
-- [Migrating to Pyrefly](./migrating-to-pyrefly) - Transition from other typecheckers like Mypy or Pyright to Pyrefly
+- [Migrating to Pyrefly](./migrating-to-pyrefly) - Transition from other type checkers like Mypy or Pyright to Pyrefly
 
 ## Error Kinds
 
@@ -1218,7 +1368,7 @@ Pyrefly provides detailed explanations for all the errors it can detect:
 
 As you become more familiar with Pyrefly, explore these advanced topics:
 
-- [Error Suppressions](./error-suppresions) - Learn how to suppress specific errors that show up in Pyrefly
+- [Error Suppressions](./error-suppressions) - Learn how to suppress specific errors that show up in Pyrefly
 - [Import Resolution](./import-resolution) - Learn how Pyrefly resolves imports in your code
 
 
@@ -1317,14 +1467,15 @@ However, projects with existing mypy configs may want to configure pyrefly to su
 To make it as easy as possible to get started with pyrefly, we've provided a script for automatically migrating a mypy config to pyrefly.
 
 ```sh
-$ pyrefly config-migration path/to/your/mypy.ini
+$ pyrefly init --migrate path/to/your/project
 ```
 
-This will load your existing `mypy.ini` and transform it into a `pyrefly.toml` while preserving as many options as possible. See `config-migration --help` for more options.
+This will search for an existing `mypy.ini` or `pyproject.toml` with a `tool.mypy` section, and then transform it into a `pyrefly.toml` (or `[tool.pyrefly]` section) while preserving as many options as possible. See `init --help` for more options.
 
 We do recommend checking the resulting config for errors. While there is some overlap between mypy's config options and pyrefly's config options, it's not always possible to cleanly translate one config option to another.
 
-If you'd rather start fresh with a hand-written config, please see the [pyrefly configuration docs](../configuration). If you run into any issues with config migration, please [let us know](https://github.com/facebook/pyrefly/issues)!
+If you'd rather start fresh with a hand-written config, please see the [pyrefly configuration docs](configuration.mdx), or consider running `pyrefly init` (without `--migrate`!) to generate a basic config.
+If you run into any issues with config migration, please [let us know](https://github.com/facebook/pyrefly/issues)!
 
 ### Config Migration Details
 
@@ -1345,13 +1496,33 @@ Becomes:
 replace_imports_with_any = ["some.*.module"]
 ```
 
-Pyrefly does support mypy's [module name pattern syntax](https://mypy.readthedocs.io/en/stable/config_file.html#config-file-format).
+Mypy's `follow_imports = "skip"` is handled the same way.
 
-Mypy's `follow_untyped_imports` option is allowed to be global or per-module. The pyrefly equivalent, `use_untyped_imports`, is only global. If any per-module section in the mypy config has `follow_untyped_imports = True`, then `use_untyped_imports` will be `true` in the pyrefly config.
+Pyrefly does support mypy's [module name pattern syntax](https://mypy.readthedocs.io/en/stable/config_file.html#config-file-format): see [Module Globbing](configuration.mdx#module-globbing) in the configuration docs.
+
+Mypy's `follow_untyped_imports` option is allowed to be global or per-module. The pyrefly equivalent, `use_untyped_imports`, is only global. This setting defaults to `true` unless
+the `follow_untyped_imports` is disabled in the `[mypy]` section of the migrated config.
+
+### Mypy Error Codes and Pyrefly Error Kinds
+
+Pyrefly maps Mypy's [error codes](https://mypy.readthedocs.io/en/stable/error_code_list.html) to equivalent pyrefly [error kinds](error-kinds.mdx).
+While not every error code has an equivalent error kind, we make an effort to ensure that pyrefly suppresses the same errors that mypy does.
+
+This may lead to overly broad error suppressions, and you may want to consider removing some error kinds from the disable list.
+You can also use a [SubConfig](configuration.mdx#sub_config) to selectively silence errors in specific files,
+or see [Silencing Errors](#silencing-errors) for how to suppress errors at the source.
+
+See [Error Kind Mapping](#error-kind-mapping) for a table showing the relationship between type check diagnostic settings and error kinds.
+
+### Per-Module configs
+
+Mypy's per-module configs let you change a wide range of configuration options for modules matching a module wildcard.
+Pyrefly's [SubConfigs](configuration.mdx#sub_config) are a similar mechanism that let you configure pyrefly's behavior for files matching a filepath glob.
+However, they support significantly fewer options, and only `disable_error_code` and `enable_error_code` will be migrated over to the pyrefly config.
 
 ## Silencing Errors
 
-Like mypy, pyrefly has ways to silence specific error codes. Full details can be found in the [Error Suppression docs](../error-suppresions)
+Like mypy, pyrefly has ways to silence specific error codes. Full details can be found in the [Error Suppression docs](error-suppressions.mdx)
 
 To silence an error on a specific line, add a disable comment above that line:
 
@@ -1367,7 +1538,19 @@ To suppress all instances of an error, disable that error in the config:
 import-error = false
 ```
 
-This is equivalent to mypy's `disable_error_code`, though of course the [error codes](../error-kinds) are different!
+This is equivalent to mypy's `disable_error_code`, though of course the [error codes](error-kinds.mdx) are different!
+
+### Error Kind Mapping
+
+
+This table shows the mapping between mypy's [error codes](https://mypy.readthedocs.io/en/stable/error_code_list.html) and pyrefly's [error kinds](error-kinds.mdx).
+
+This table will be expanded as more diagnostics are supported.
+
+| Mypy | Pyrefly |
+| ------- | ------- |
+| attr-defined | missing-attribute |
+| union-attr | missing-attribute |
 
 
 ---
@@ -1401,14 +1584,15 @@ However, projects with existing pyright configs may want to configure pyrefly to
 To make it as easy as possible to get started with pyrefly, we've provided a script for automatically migrating a pyright config to pyrefly.
 
 ```sh
-$ pyrefly config-migration path/to/your/pyrightconfig.json
+$ pyrefly init --migrate path/to/your/project
 ```
 
-This will load your existing `pyrightconfig.json` and transform it into a `pyrefly.toml` while preserving as many options as possible. See `config-migration --help` for more options.
+This will search for an existing `pyrightconfig.json` or `pyproject.toml` with a `tool.pyright` section, and then transform it into a `pyrefly.toml` (or `[tool.pyrefly]` section) while preserving as many options as possible. See `init --help` for more options.
 
 There is a significant overlap between pyright's and pyrefly's configuration options, so migration is pretty straightforward. However, it may be worth checking the generated config for errors, just in case.
 
-If you'd rather start fresh with a hand-written config, please see the [pyrefly configuration docs](../configuration). If you run into any issues with config migration, please [let us know](https://github.com/facebook/pyrefly/issues)!
+If you'd rather start fresh with a hand-written config, please see the [pyrefly configuration docs](configuration.mdx), or consider running `pyrefly init` (without `--migrate`!) to generate a basic config.
+If you run into any issues with config migration, please [let us know](https://github.com/facebook/pyrefly/issues)!
 
 ## Config Migration Details
 
@@ -1416,9 +1600,28 @@ When it comes to listing files, pyright uses just paths, while pyrefly supports 
 
 Pyright supports four platforms: Windows, Linux, Darwin (macOS), and All. Since pyrefly only supports Python's [supported platforms](https://docs.python.org/3/library/sys.html#sys.platform), we choose to treat "All" as "linux".
 
+### Type Check Diagnostic Settings and Error Kinds
+
+Pyrefly maps pyright's [type check diagnostics settings](https://microsoft.github.io/pyright/#/configuration?id=type-check-diagnostics-settings) to equivalent pyrefly [error kinds](error-kinds.mdx).
+While not every diagnostic setting has an equivalent error kind, we make an effort to ensure that pyrefly suppresses the same errors that pyright does.
+
+This may lead to overly broad error suppressions, and you may want to consider removing some error kinds from the disable list.
+You can also use a [SubConfig](configuration.mdx#sub_config) to selectively silence errors in specific files,
+or see [Silencing Errors](#silencing-errors) for how to suppress errors at the source.
+
+See [Error Kind Mapping](#error-kind-mapping) for a table showing the relationship between type check diagnostic settings and error kinds.
+
+### Execution Environments
+
+Pyright's [execution environments](https://microsoft.github.io/pyright/#/configuration?id=execution-environment-options) let you customize the Python version, platform, module search paths, and diagnostic settings for some part of your project.
+Pyrefly's [SubConfigs](configuration.mdx#sub_config) are a similar mechanism that let you configure pyrefly's behavior for files matching a filepath glob.
+However, subconfigs do not support changing the Python version, platform, or module search paths.
+
+Diagnostic settings are carried over to the equivalent subconfig, using the mapping mentioned [above](#type-check-diagnostic-settings-and-error-kinds).
+
 ## Silencing Errors
 
-Like pyright, pyrefly has ways to silence specific error codes. Full details can be found in the [Error Suppression docs](../error-suppresions).
+Like pyright, pyrefly has ways to silence specific error codes. Full details can be found in the [Error Suppression docs](error-suppressions.mdx).
 
 To silence an error on a specific line, add a disable comment above that line:
 
@@ -1434,14 +1637,26 @@ To suppress all instances of an error, disable that error in the config:
 import-error = false
 ```
 
-This is similar to pyright's [type check rule overrides](https://microsoft.github.io/pyright/#/configuration?id=type-check-rule-overrides), though of course the [error codes](../error-kinds) are different!
+This is similar to pyright's [type check rule overrides](https://microsoft.github.io/pyright/#/configuration?id=type-check-rule-overrides), though of course the [error codes](error-kinds.mdx) are different!
+
+## Error Kind Mapping
+
+This table shows the mapping between pyright's [type check diagnostics settings](https://microsoft.github.io/pyright/#/configuration?id=type-check-diagnostics-settings)
+and pyrefly's [error kinds](error-kinds.mdx).
+
+This table will be expanded as more diagnostics are supported.
+
+| Pyright | Pyrefly |
+| ------- | ------- |
+| reportMissingImports | import-error |
+| reportMissingModuleSource | import-error |
 
 
 ---
 
 ---
 title: Migrating to Pyrefly
-description: How to switch from another typechecker to Pyrefly
+description: How to switch from another type checker to Pyrefly
 ---
 
 # Migrating to Pyrefly
@@ -1472,29 +1687,23 @@ description:
 
 # Pyrefly Frequently Asked Questions
 
-### What is Pyrefly?
-
-Pyrefly is a type checker for Python powering a fast and flexible IDE
-experience. It's a work in progress, but showing promising results for checking
-large code bases, better type inference and giving instant responses in IDE.
-
 ### How do I pronounce Pyrefly?
 
 It's pronounced PIE-ur-fly, rhyming with "firefly."
 
 ### What is the relationship to Pyre?
 
-Pyrefly is a ground-up rebuild that doesn’t share any core type checking code with Pyre. Not only is Pyrefly written in a new language (Rust instead of OCaml), but our design deviates in a major way from [Pyre](https://pyre-check.org/). Rust enables us to deliver substantial performance improvements and support multiple operating systems (including Windows). Beyond the core type checker itself, there are helper tooling and many lessons learned that we will take from Pyre and the community of Python type checking maintainers who have done tremendous work to get the state of type checking to where it is today.
+Pyrefly is a ground-up rebuild that doesn’t share any core type checking code with Pyre. Not only is Pyrefly written in a new language (Rust instead of OCaml), but its design deviates in a major way from [Pyre](https://pyre-check.org/). Rust enables us to deliver substantial performance improvements and support multiple operating systems (including Windows). Beyond the core type checker itself, there are helper tooling and many lessons learned that we will take from Pyre and the community of Python type checking maintainers who have done tremendous work to get the state of type checking to where it is today.
 
 ### Yet another Type Checker! Why not improve the ones adopted by the community already?
 
-We are standing on the shoulders of giants. The contributions to Python typing by Mypy, Pyright, Pytype, Pyre and others have been invaluable. We borrowed concepts and learned from them as we rolled our own. Open source conformance matters to us a lot. While we might make some opinionated decisions, we will adhere to the PEP process. Pyre was the only type checker that could scale for Meta’s needs and was starting to show its age, so we started with a ground-up rewrite aimed at usability and performance.
+We are standing on the shoulders of giants. The contributions to Python typing by Mypy, Pyright, Pytype, Pyre and others have been invaluable. We borrowed concepts and learned from them as we rolled our own. Open source conformance matters to us a lot. While we might make some opinionated decisions, we'll adhere to the PEP process. Pyre was the only type checker that could scale for Meta’s needs and was starting to show its age, so we started with a ground-up rewrite aimed at usability and performance.
 
-We built our own engine for incremental computation and designed our type checking algorithm based on years of experience in gradual type theory and Rust expertise. By open-sourcing this technology we hope it can serve projects of any size well.
+We built a custom engine for incremental computation and designed our type-checking algorithm based on years of experience in gradual typing theory and Rust expertise. By open-sourcing this technology we hope it can serve projects of any size well.
 
 ### Why Rust?
 
-We would have preferred to write Pyrefly in Python, but didn't think we could hit our ambitious performance goals using Python today (hopefully future work around free-threaded Python and JIT changes that). After ruling out Python, we wanted something that was safe, cross-platform, compiled to WASM (for a Playground experience). Rust and Go are probably the best choices for those goals, and our team at Meta had more experience with Rust.
+We would have preferred to write Pyrefly in Python, but we didn't think we could hit our ambitious performance goals using Python today (hopefully future work around free-threaded Python and JIT changes that). After ruling out Python, we wanted something that was safe, cross-platform, compiled to WASM (for a Playground experience). Rust and Go are probably the best choices for those goals, and our team at Meta had more experience with Rust.
 
 ### Do you plan to build an LSP?
 
@@ -1510,7 +1719,7 @@ Please see the: [contributing guidelines](https://github.com/facebook/pyrefly/bl
 
 ### How do I know this project won't go unmaintained after a year?
 
-Great question. We have made a substantial investment in Pyrefly, use it internally and aligned open source maintainability as a key principle for starting this project in the first place. We’re in it for the long haul. Using it is the best way to see increased investment from our leadership.
+Great question. We have made a substantial investment in Pyrefly, use it internally and aligned open source maintainability as a key principle for starting this project in the first place. We’re in it for the long haul. Using it is the best way to encourage further investment from our leadership.
 
 ### This is cool, I want to learn more about the technical details.
 
@@ -1518,7 +1727,7 @@ See our [README.md](https://github.com/facebook/pyrefly/blob/main/README.md) for
 
 ### I don't like Python's Type System. Stop wasting your time.
 
-Tell us more - seriously we want to hear your objections to typing! We hope that better tooling, improvements to the type system and well typed libraries will help provide make development easier. If all else fails our fast code navigation and inference algorithm might spark joy in your IDE, so give us a chance.
+Tell us more - seriously! We want to hear your objections to typing. We hope that better tooling, improvements to the type system and well typed libraries will help provide make development easier. If all else fails our fast code navigation and inference algorithm might spark joy in your IDE, so give us a chance.
 
 _Curious about something else or just want to chat about bolting types onto Python, join us on [Discord](https://discord.gg/Cf7mFQtW7W)._
 
@@ -1526,17 +1735,17 @@ _Curious about something else or just want to chat about bolting types onto Pyth
 ---
 
 ---
-title: Python Typing for Beginners
+title: Python Typing for New Developers
 description: A gentle, example‑driven introduction to static type hints in Python.
 ---
 
 import CodeSnippet from '@site/src/sandbox/CodeSnippet'
 
-# Python Typing for Beginners
+# Python Typing for New Developers
 
 *A beginner‑friendly guide to adding type hints in Python.*
 
-**Note:** This tutorial assumes you understand some basic Python syntax, but are new to type hints. To learn more about Python, see the [Python Tutorial](https://docs.python.org/3/tutorial/) and [Getting Started Guide](https://www.python.org/about/gettingstarted/)
+**Note:** This tutorial assumes you understand some basic Python syntax, but are new to programming or type hints. To learn more about Python, see the [Python Tutorial](https://docs.python.org/3/tutorial/) and [Getting Started Guide](https://www.python.org/about/gettingstarted/)
 
 ## 1. What is a Type Hint in Python?
 
@@ -1718,7 +1927,7 @@ import CodeSnippet from '@site/src/sandbox/CodeSnippet'
 
 **Goal:** In five minutes you'll know how Python's static type system _infers_, _defines_, and _composes_ types—and you'll have copy‑paste snippets to start using right away.
 
-If you are new to Python, check out our [Python Typing for Beginners guide](../python-typing-for-beginners/).
+If you are new to Python, check out our [Python Typing for New Developers guide](../python-typing-for-beginners/).
 
 Python's type system allows you to annotate variables so you, your teammates and your type checker can find bugs before you run your code. Think of it as documentation that's automatically validated and will help your IDE help you.
 
