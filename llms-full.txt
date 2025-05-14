@@ -1433,6 +1433,63 @@ pyrefly check --remove-unused-ignores
 ```
 Repeat the steps above until you get a clean formatting run and a clean type check.
 
+----
+
+## Add Pyrefly to CI
+
+Once your project passes type checks without errors, you can ensure no new bugs are introduced. This is best enforced through CI (Continuous Integration) to prevent other maintainers from merging code with errors. Here is an example for GitHub.
+
+Save your workflow in this path in your repository:
+```
+.github/workflows/typecheck.yml
+```
+
+GitHub automatically detects any `.yml` files inside `.github/workflows/` and sets up the defined workflows.
+
+```
+name: Pyrefly Type Check
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:  # Allows manual triggering from the GitHub UI
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+
+      # Install Python dependencies and create environment
+      - name: Install dependencies and run pytest
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip
+          # Install your dependencies; adjust the following lines as needed
+          pip install -r requirements-dev.txt
+
+      - name: Install Pyrefly
+        run: pip install pyrefly
+
+      - name: Run Pyrefly Type Checker
+        run: pyrefly check
+```
+
+### A few notes about this setup:
+- Building your environment and installing dependencies will enhance type safety by checking the types of imports. *This is not required, but encouraged!*
+- Simply drop in `pyrefly check` to existing workflows that build and test your environment.
+```
+      - name: Run Pyrefly Type Checker
+        run: pyrefly check
+```
+- Your `pyrefly.toml` or pyrefly configs in your `pyproject.toml` will be automatically detected. Learn how to [configure pyrefly here](../configuration).
+
 This will add ` # pyrefly: ignore` comments to your code that will enable you to silence errors, and come back and fix them at a later date. This can make the process of upgrading a large codebase much more manageable.
 
 
@@ -1730,6 +1787,38 @@ See our [README.md](https://github.com/facebook/pyrefly/blob/main/README.md) for
 Tell us more - seriously! We want to hear your objections to typing. We hope that better tooling, improvements to the type system and well typed libraries will help provide make development easier. If all else fails our fast code navigation and inference algorithm might spark joy in your IDE, so give us a chance.
 
 _Curious about something else or just want to chat about bolting types onto Python, join us on [Discord](https://discord.gg/Cf7mFQtW7W)._
+
+
+---
+
+---
+title: Typing Features and PEPS
+---
+
+*Typing Features and PEPS available in each Python Version.*
+
+| Feature (click PEP for details) | What it adds / looks like | Introduced in |
+| --- | --- | --- |
+| [PEP 484](https://peps.python.org/pep-0484/) -- Core **type hints** & `typing` module | `def add(a: int, b: int) -> int:` | **3.5** |
+| [PEP 526](https://peps.python.org/pep-0526/) -- **Variable annotations** | `count: int = 0` | **3.6** |
+| [PEP 563](https://peps.python.org/pep-0563/) -- `from __future__ import annotations` (lazy eval) | Annotations stored as **strings** | **3.7** (future‑flag) |
+| [PEP 544](https://peps.python.org/pep-0544/) -- **Protocols** (structural typing) | `class Jsonable(Protocol): ...` | **3.8** |
+| [PEP 589](https://peps.python.org/pep-0589/) -- **TypedDict** | `class User(TypedDict): ...` | **3.8** |
+| [PEP 586](https://peps.python.org/pep-0586/) -- **Literal** types | `def log(level: Literal["info","warn"]): ...` | **3.8** |
+| [PEP 591](https://peps.python.org/pep-0591/) -- **Final** qualifier | `TOKEN: Final[str] = "..."` | **3.8** |
+| [PEP 585](https://peps.python.org/pep-0585/) -- **Built‑in generics** | `list[int]`, `dict[str, Any]` | **3.9** |
+| [PEP 593](https://peps.python.org/pep-0593/) -- **Annotated** | `x: Annotated[int, "units=px"]` | **3.9** |
+| [PEP 604](https://peps.python.org/pep-0604/) -- **Union** syntax | `int \| None` | **3.10** |
+| [PEP 612](https://peps.python.org/pep-0612/) -- **ParamSpec / Concatenate** | decorator‑safe generics | **3.10** |
+| [PEP 613](https://peps.python.org/pep-0613/) -- `TypeAlias` qualifier | `Vector: TypeAlias = list[float]` | **3.10** |
+| [PEP 647](https://peps.python.org/pep-0647/) -- **TypeGuard** for narrowing | `def is_str(x) -> TypeGuard[str]: ...` | **3.10** |
+| [PEP 655](https://peps.python.org/pep-0655/) -- `Required` / `NotRequired` for **TypedDict** | optional vs. mandatory keys | **3.11** |
+| [PEP 646](https://peps.python.org/pep-0646/) -- **Variadic generics** (`TypeVarTuple`, `Unpack`) | tensor shapes, 2‑D arrays, ... | **3.11** |
+| [PEP 673](https://peps.python.org/pep-0673/) -- **Self** type | fluent APIs: `def set(...) -> Self:` | **3.11** |
+| [PEP 681](https://peps.python.org/pep-0681/) -- **dataclass_transform** helper | libraries like Pydantic, attrs | **3.11** |
+| [PEP 695](https://peps.python.org/pep-0695/) -- **Class‑level generics syntax** | `class Box[T]: ...` | **3.12** |
+| [PEP 698](https://peps.python.org/pep-0698/) -- `@override` decorator | flag intentional overrides | **3.13** |
+| [PEP 649](https://peps.python.org/pep-0649/) -- *New* deferred‑eval algorithm (replaces PEP 563) | becomes the default | **3.14** |
 
 
 ---
@@ -2163,30 +2252,8 @@ reveal_type(f("")) # revealed type: str
 `}
 />
 
-## Typing Features, PEPS available in each Python Version
-
-| Feature (click PEP for details) | What it adds / looks like | Introduced in |
-| --- | --- | --- |
-| [PEP 484](https://peps.python.org/pep-0484/) -- Core **type hints** & `typing` module | `def add(a: int, b: int) -> int:` | **3.5** |
-| [PEP 526](https://peps.python.org/pep-0526/) -- **Variable annotations** | `count: int = 0` | **3.6** |
-| [PEP 563](https://peps.python.org/pep-0563/) -- `from __future__ import annotations` (lazy eval) | Annotations stored as **strings** | **3.7** (future‑flag) |
-| [PEP 544](https://peps.python.org/pep-0544/) -- **Protocols** (structural typing) | `class Jsonable(Protocol): ...` | **3.8** |
-| [PEP 589](https://peps.python.org/pep-0589/) -- **TypedDict** | `class User(TypedDict): ...` | **3.8** |
-| [PEP 586](https://peps.python.org/pep-0586/) -- **Literal** types | `def log(level: Literal["info","warn"]): ...` | **3.8** |
-| [PEP 591](https://peps.python.org/pep-0591/) -- **Final** qualifier | `TOKEN: Final[str] = "..."` | **3.8** |
-| [PEP 585](https://peps.python.org/pep-0585/) -- **Built‑in generics** | `list[int]`, `dict[str, Any]` | **3.9** |
-| [PEP 593](https://peps.python.org/pep-0593/) -- **Annotated** | `x: Annotated[int, "units=px"]` | **3.9** |
-| [PEP 604](https://peps.python.org/pep-0604/) -- **Union** syntax | `int \| None` | **3.10** |
-| [PEP 612](https://peps.python.org/pep-0612/) -- **ParamSpec / Concatenate** | decorator‑safe generics | **3.10** |
-| [PEP 613](https://peps.python.org/pep-0613/) -- `TypeAlias` qualifier | `Vector: TypeAlias = list[float]` | **3.10** |
-| [PEP 647](https://peps.python.org/pep-0647/) -- **TypeGuard** for narrowing | `def is_str(x) -> TypeGuard[str]: ...` | **3.10** |
-| [PEP 655](https://peps.python.org/pep-0655/) -- `Required` / `NotRequired` for **TypedDict** | optional vs. mandatory keys | **3.11** |
-| [PEP 646](https://peps.python.org/pep-0646/) -- **Variadic generics** (`TypeVarTuple`, `Unpack`) | tensor shapes, 2‑D arrays, ... | **3.11** |
-| [PEP 673](https://peps.python.org/pep-0673/) -- **Self** type | fluent APIs: `def set(...) -> Self:` | **3.11** |
-| [PEP 681](https://peps.python.org/pep-0681/) -- **dataclass_transform** helper | libraries like Pydantic, attrs | **3.11** |
-| [PEP 695](https://peps.python.org/pep-0695/) -- **Class‑level generics syntax** | `class Box[T]: ...` | **3.12** |
-| [PEP 698](https://peps.python.org/pep-0698/) -- `@override` decorator | flag intentional overrides | **3.13** |
-| [PEP 649](https://peps.python.org/pep-0649/) -- *New* deferred‑eval algorithm (replaces PEP 563) | becomes the default | **3.14** |
+## Typing Features and PEPS available in each Python Version
+See the full list of features available in the Python type system [here](../python-features-and-peps).
 
 ### Key Highlights Summary:
 - **Inference:** Python's static analyzers can infer types from your code, reducing the need for explicit annotations. This feature enhances code readability and helps catch bugs early.
