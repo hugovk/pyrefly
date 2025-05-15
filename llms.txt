@@ -12,6 +12,7 @@
 - [Installation](installation): How to install Pyrefly
 - [Migrating from Mypy](migrating-from-mypy): How to switch from Mypy to Pyrefly
 - [Migrating from Pyright](migrating-from-pyright): How to switch from Pyright to Pyrefly
+- [Migration Guide](migrating-to-pyrefly): How to switch from another type checker to Pyrefly
 - [FAQ](pyrefly-faq): Frequently Asked Questions about Pyrefly, a PEP 484 compliant Type Checker for Python and IDE extension.
 - [Typing Features and PEPS](python-features-and-peps): Typing Features and PEPS available in each Python Version.
 - [Python Typing for New Developers](python-typing-for-beginners): A gentle, example‑driven introduction to static type hints in Python.
