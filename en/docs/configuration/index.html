@@ -26,8 +26,8 @@
 <script src="https://buttons.github.io/buttons.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.0/clipboard.min.js"></script>
 <script src="/js/code-block-buttons.js"></script><link rel="stylesheet" href="/assets/css/styles.35cd6fea.css">
-<script src="/assets/js/runtime~main.909160d0.js" defer="defer"></script>
-<script src="/assets/js/main.692120a8.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.a5aa1d1f.js" defer="defer"></script>
+<script src="/assets/js/main.cc8339dc.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
 <script>!function(){function t(t){document.documentElement.setAttribute("data-theme",t)}var e=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme")}catch(t){}}();t(null!==e?e:"dark")}(),function(){try{const n=new URLSearchParams(window.location.search).entries();for(var[t,e]of n)if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()</script>
@@ -46,18 +46,22 @@ name with the <code>--config</code>/<code>-c</code> flag, but they will not be a
 <a href="#configuration-finding">Configuration Finding</a>.</p>
 <p>Both absolute and config-relative paths are supported.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="precedence-in-options">Precedence in Options<a href="#precedence-in-options" class="hash-link" aria-label="Direct link to Precedence in Options" title="Direct link to Precedence in Options">​</a></h2>
-<p>The following is the order in which configuration options are selected:</p>
+<p><a href="#configuration-options">Configuration options</a> are selected in the following order</p>
 <ol>
-<li>CLI flag</li>
-<li>Environment variable override -- This is the same as <code>PYREFLY_&lt;CLI flag name&gt;</code></li>
-<li>Configuration option</li>
-<li>Hard-coded default</li>
+<li>CLI flags</li>
+<li>Examples: <code>--project-excludes &lt;value&gt;</code>, <code>--python-version &lt;value&gt;</code></li>
+<li>Environment variable overrides -- this is the same as <code>PYREFLY_&lt;config option name&gt;</code></li>
+<li>Examples: <code>export PROJECT_EXCLUDES=&lt;value&gt;</code>, <code>PYTHON_VERSION=&lt;value&gt; pyrefly ...</code></li>
+<li>Configuration options</li>
+<li>Examples: (in a <code>pyrefly.toml</code>) <code>project_excludes = &lt;value&gt;</code>, <code>python_version = &lt;value&gt;</code></li>
+<li>Pyrefly defaults</li>
+<li>See <a href="#default-pyreflytoml">Default <code>pyrefly.toml</code></a> for the default values used</li>
 </ol>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="type-checking-modes">Type Checking Modes<a href="#type-checking-modes" class="hash-link" aria-label="Direct link to Type Checking Modes" title="Direct link to Type Checking Modes">​</a></h2>
 <p>Pyrefly has two different modes it can run in when type checking your project, which
 correspond to different but useful ways we expect most people to interact with Pyrefly:</p>
 <ul>
-<li>Project mode: attempt to load a config, falling back to Pyrefly&#x27;s default config when
+<li><strong>Project</strong> mode: attempt to load a config, falling back to Pyrefly&#x27;s default config when
 none can be found, and type check using that one config. This involves getting the
 <a href="#project_includes"><code>project_includes</code></a> and <a href="#project_excludes"><code>project_excludes</code></a> from the file, expanding the patterns,
 and type checking on those files.<!-- -->
@@ -65,7 +69,7 @@ and type checking on those files.<!-- -->
 <li>Project mode is used whenever no files are provided with the CLI invocation.</li>
 </ul>
 </li>
-<li>Per-file or Single-file mode: when given <a href="#project_includes"><code>FILES...</code></a> (and optionally <a href="#project_excludes"><code>--project-excludes</code></a>)
+<li><strong>Per-file</strong> or <strong>Single-file</strong> mode: when given <a href="#project_includes"><code>FILES...</code></a> (and optionally <a href="#project_excludes"><code>--project-excludes</code></a>)
 during a CLI invocation, expand the patterns and find the relevant config file for each
 file listed. <code>project_includes</code> and <code>project_excludes</code> are ignored from the config file,
 but it is used for all remaining config options.</li>
@@ -73,13 +77,17 @@ but it is used for all remaining config options.</li>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="configuration-finding">Configuration Finding<a href="#configuration-finding" class="hash-link" aria-label="Direct link to Configuration Finding" title="Direct link to Configuration Finding">​</a></h2>
 <p>In both project checking mode and single-file checking mode (see <a href="#type-checking-modes">Type Checking Modes</a>
 for more info), we attempt to find a <em>project root</em> from which to check each file, both for reading
-config options and for import resolution  (see <a href="/en/docs/import-resolution/#import-root">Import Root</a>). The
-project root is typically the directory containing the configuration file. More precisely:</p>
+config options and for import resolution. The project root is typically the directory containing the
+configuration file. More precisely:</p>
 <ol>
-<li>If a configuration file is provided with <code>-c</code>/<code>--config</code>, we use its containing directory.</li>
-<li>Otherwise, we perform an upward file search from the &#x27;start location&#x27; to the filesystem root,
+<li>If a configuration file is provided with <code>-c</code>/<code>--config</code>, we use the directory the file is located in as the directory to check.</li>
+<li>If no configuration file is passed, we perform an upward file search from the &#x27;start location&#x27; to the filesystem root,
 looking in each directory for any of the following files: <code>pyrefly.toml</code>, <code>pyproject.toml</code>,
-<code>setup.py</code>, <code>mypy.ini</code>, and <code>pyrightconfig.json</code>. If we find one, we use the current directory.</li>
+<code>setup.py</code>, <code>mypy.ini</code>, and <code>pyrightconfig.json</code>. If we find one, we use the directory it&#x27;s found in as the containing directory.</li>
+<li>If no configuration file is found, we will still attempt to resolve imports by walking up the tree looking for a matching import. For example: when
+importing <code>from a.b.c import q</code>, if our project structure
+looks like <code>/x/y/z/a/b/c</code>, we can walk up the components of <code>a.b.c</code> to find a root at
+<code>/x/y/z</code>.</li>
 </ol>
 <p>Note that only <code>pyrefly.toml</code> and <code>pyproject.toml</code> are parsed for config options, but we look for
 additional files that mark the root of a project to aid import resolution.</p>
@@ -130,7 +138,7 @@ type checking as way to filter files that match <code>project_includes</code>,
 but we don&#x27;t want to type check.</p>
 <ul>
 <li>Type: list of <a href="#filesystem-globbing">filesystem glob patterns</a></li>
-<li>Default: <code>[&quot;**/.[!/.]*&quot;]</code></li>
+<li>Default: <code>[&quot;**/.[!/.]*&quot;, &quot;**/*venv/**&quot;]</code></li>
 <li>Flag equivalent: <code>--project-excludes</code></li>
 <li>Equivalent configs: <code>exclude</code> in Pyright and mypy</li>
 <li>Notes:<!-- -->
@@ -386,12 +394,12 @@ be compatible with other systems type checking your project.</p>
 <ul>
 <li>We recognize the following wildcards:<!-- -->
 <ul>
-<li><code>*</code>, which matches zero or more characters in a single directory component</li>
-<li><code>**</code>, which matches the current and any sub directories/files in those sub directories</li>
-<li><code>?</code>, which matches any one character</li>
-<li><code>[&lt;pattern&gt;]</code>, which matches any character or character range between the brackets (character range separated by <code>-</code>)</li>
-<li><code>[!&lt;pattern&gt;]</code>, which excludes any character or character range between the brackets and after the <code>!</code></li>
-<li><code>[]</code> can be used to match <code>?</code>, <code>*</code>, <code>[</code>, <code>]</code> literally (e.g. <code>[?]</code>), although these are invalid as part of a Python path.</li>
+<li><code>*</code> matches zero or more characters in a single directory component</li>
+<li><code>**</code> matches the current and any sub directories/files in those sub directories</li>
+<li><code>?</code> matches any one character</li>
+<li><code>[&lt;pattern&gt;]</code> matches any character or character range between the brackets (character range separated by <code>-</code>)</li>
+<li><code>[!&lt;pattern&gt;]</code> excludes any character or character range between the brackets and after the <code>!</code></li>
+<li>Note: <code>[]</code> can be used to match <code>?</code>, <code>*</code>, <code>[</code>, <code>]</code> literally (e.g. <code>[?]</code>), although these are invalid as part of a Python path.</li>
 </ul>
 </li>
 </ul>
