@@ -38,6 +38,23 @@ Support for other editors is community-driven. If you would like to set this up,
 ### Jetbrains
 An unofficial Jetbrains extension has been developed [here](https://plugins.jetbrains.com/plugin/26829-pyrefly)
 
+### Neovim 0.11+
+Place the following file under `~/.config/nvim/lsp`
+```lua
+return {
+  cmd = { "pyrefly", "lsp" },
+  filetypes = { "python" },
+  settings = {},
+  on_exit = function(code, _, _)
+    vim.notify("Closing Pyrefly LSP exited with code: " .. code, vim.log.levels.INFO)
+  end,
+}
+```
+Then enable it in `init.lua`:
+```lua
+vim.lsp.enable({"pyrefly"})
+```
+
 ### Neovim + `lspconfig`
 With the `lspconfig` [plugin](https://github.com/neovim/nvim-lspconfig) and `uv` installed, you can use this configuration:
 ```lua
@@ -58,31 +75,45 @@ end
 lspconfig.pyrefly.setup({})
 ```
 
-### Neovim 0.11+
-Place the following file under `~/.config/nvim/lsp`
-```lua
-return {
-  cmd = { "pyrefly", "lsp" },
-  filetypes = { "python" },
-  settings = {},
-  on_exit = function(code, _, _)
-    vim.notify("Closing Pyrefly LSP exited with code: " .. code, vim.log.levels.INFO)
-  end,
-}
-```
-Then enable it in `init.lua`:
-```lua
-vim.lsp.enable({"pyrefly"})
+### Vim/Neovim + coc.nvim
+
+Ensure the pyrefly is on `$PATH`, add following snippet to your `coc-settings.json`:
+
+```json
+"languageserver": {
+  "pyrefly": {
+    "command": "pyrefly",
+    "args": ["lsp"],
+    "filetypes": ["python"],
+    "rootPatterns": ["pyrefly.toml", "pyproject.toml", ".git"],
+  }
+},
 ```
 
-### Vim + Ale
-Once [this](https://github.com/dense-analysis/ale/pull/4972) gets merged, you will only need:
+### Vim + ALE
+Pull the latest version of ALE and add the following lines to your configuration
+to enable Pyrefly in Vim with ALE:
 ```
 let g:ale_linters = {
     ...
   \ 'python': ['pyrefly'],
     ...
   \ }
+```
+
+### Helix
+
+Ensure that pyrefly is on `$PATH` (If you got Pyrefly using `pip install pyrefly`, it should already be on your path).
+Add this snippet to your `languages.toml` file
+
+```toml
+[language-server.pyrefly]
+command = "pyrefly"
+args = ["lsp"]
+
+[[language]]
+name = "python"
+language-servers = ["pyrefly"]
 ```
 
 
@@ -1925,7 +1956,7 @@ This will search for an existing `mypy.ini` or `pyproject.toml` with a `tool.myp
 
 We do recommend checking the resulting config for errors. While there is some overlap between mypy's config options and pyrefly's config options, it's not always possible to cleanly translate one config option to another.
 
-If you'd rather start fresh with a hand-written config, please see the [pyrefly configuration docs](configuration.mdx), or consider running `pyrefly init` (without `--migrate`!) to generate a basic config.
+If you'd rather start fresh with a hand-written config, please see the [pyrefly configuration docs](configuration.mdx).
 If you run into any issues with config migration, please [let us know](https://github.com/facebook/pyrefly/issues)!
 
 ### Config Migration Details
@@ -2042,7 +2073,7 @@ This will search for an existing `pyrightconfig.json` or `pyproject.toml` with a
 
 There is a significant overlap between pyright's and pyrefly's configuration options, so migration is pretty straightforward. However, it may be worth checking the generated config for errors, just in case.
 
-If you'd rather start fresh with a hand-written config, please see the [pyrefly configuration docs](configuration.mdx), or consider running `pyrefly init` (without `--migrate`!) to generate a basic config.
+If you'd rather start fresh with a hand-written config, please see the [pyrefly configuration docs](configuration.mdx).
 If you run into any issues with config migration, please [let us know](https://github.com/facebook/pyrefly/issues)!
 
 ## Config Migration Details

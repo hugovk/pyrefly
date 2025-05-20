@@ -38,6 +38,23 @@ Support for other editors is community-driven. If you would like to set this up,
 ### Jetbrains
 An unofficial Jetbrains extension has been developed [here](https://plugins.jetbrains.com/plugin/26829-pyrefly)
 
+### Neovim 0.11+
+Place the following file under `~/.config/nvim/lsp`
+```lua
+return {
+  cmd = { "pyrefly", "lsp" },
+  filetypes = { "python" },
+  settings = {},
+  on_exit = function(code, _, _)
+    vim.notify("Closing Pyrefly LSP exited with code: " .. code, vim.log.levels.INFO)
+  end,
+}
+```
+Then enable it in `init.lua`:
+```lua
+vim.lsp.enable({"pyrefly"})
+```
+
 ### Neovim + `lspconfig`
 With the `lspconfig` [plugin](https://github.com/neovim/nvim-lspconfig) and `uv` installed, you can use this configuration:
 ```lua
@@ -58,29 +75,43 @@ end
 lspconfig.pyrefly.setup({})
 ```
 
-### Neovim 0.11+
-Place the following file under `~/.config/nvim/lsp`
-```lua
-return {
-  cmd = { "pyrefly", "lsp" },
-  filetypes = { "python" },
-  settings = {},
-  on_exit = function(code, _, _)
-    vim.notify("Closing Pyrefly LSP exited with code: " .. code, vim.log.levels.INFO)
-  end,
-}
-```
-Then enable it in `init.lua`:
-```lua
-vim.lsp.enable({"pyrefly"})
+### Vim/Neovim + coc.nvim
+
+Ensure the pyrefly is on `$PATH`, add following snippet to your `coc-settings.json`:
+
+```json
+"languageserver": {
+  "pyrefly": {
+    "command": "pyrefly",
+    "args": ["lsp"],
+    "filetypes": ["python"],
+    "rootPatterns": ["pyrefly.toml", "pyproject.toml", ".git"],
+  }
+},
 ```
 
-### Vim + Ale
-Once [this](https://github.com/dense-analysis/ale/pull/4972) gets merged, you will only need:
+### Vim + ALE
+Pull the latest version of ALE and add the following lines to your configuration
+to enable Pyrefly in Vim with ALE:
 ```
 let g:ale_linters = {
     ...
   \ 'python': ['pyrefly'],
     ...
   \ }
+```
+
+### Helix
+
+Ensure that pyrefly is on `$PATH` (If you got Pyrefly using `pip install pyrefly`, it should already be on your path).
+Add this snippet to your `languages.toml` file
+
+```toml
+[language-server.pyrefly]
+command = "pyrefly"
+args = ["lsp"]
+
+[[language]]
+name = "python"
+language-servers = ["pyrefly"]
 ```
