@@ -583,9 +583,17 @@ impl Args {
             number_thousands(handles.len()),
             if handles.len() == 1 { "" } else { "s" },
             number_thousands(transitive_dependencies_count),
-            if transitive_dependencies_count == 1 { "y" } else { "ies" },
+            if transitive_dependencies_count == 1 {
+                "y"
+            } else {
+                "ies"
+            },
             number_thousands(transaction.line_count()),
-            if transaction.line_count() == 1 { "" } else { "s" },
+            if transaction.line_count() == 1 {
+                ""
+            } else {
+                "s"
+            },
             memory_trace.peak()
         );
         if let Some(timings) = &self.report_timings {
